@@ -7,6 +7,7 @@ class Game(db.Entity):
     name = Required(str)
     creation_date = Required(datetime.datetime)
     player_amount = Required(int)
+    started = Required(bool)
     status = Required(Json)
     board = Optional('Board')
     players = Set('Player')
