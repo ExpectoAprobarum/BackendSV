@@ -16,7 +16,6 @@ def create_game(inputGame: GameM):
     status = {}
     with db_session:
         newGame = Game(name=inputGame.name, creation_date=datetime.datetime.now(), player_amount=inputGame.player_amount, status={})
-        print(newGame)
         status = {'id': newGame.id, 'message': 'Game created succesfully'}
     return status
 
