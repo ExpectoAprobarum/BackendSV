@@ -14,5 +14,6 @@ To see swagger docs just add to the url: /docs
 
 ### Endpoints
 
-* / (get)
+* /games (get: list all games)
+* /games (post: create a new game, returns game id and a message)
 * /users (post/get)
