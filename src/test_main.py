@@ -3,10 +3,12 @@ from .main import app
 
 client = TestClient(app)
 
+
 def test_get_games():
     response = client.get("/games/", headers={"X-Token": "coneofsilence"})
     assert response.status_code == 200
     assert type(response.json()["data"]) is list
+
 
 def test_get_game():
     response = client.get("/games/1", headers={"X-Token": "coneofsilence"})
@@ -18,9 +20,12 @@ def test_get_game():
     assert type(g["started"]) is bool
     assert type(g["status"]) is dict
 
+
 def test_create_games():
-    response = client.post("/games/", headers={"X-Token": "coneofsilence"}, 
-                            json={"name": "Juego 1", "player_amount": 5})
+    response = client.post(
+        "/games/", headers={"X-Token": "coneofsilence"},
+        json={"name": "Juego 1", "player_amount": 5}
+    )
     assert response.status_code == 200
     g = response.json()
     assert type(g["id"]) is int
@@ -28,5 +33,8 @@ def test_create_games():
 
 
 def test_start_game():
-    response = client.post("/games/7/start", headers={"X-Token": "coneofsilence"})
+    response = client.post(
+        "/games/7/start",
+        headers={"X-Token": "coneofsilence"}
+    )
     assert response.status_code == 200
