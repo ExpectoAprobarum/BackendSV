@@ -77,7 +77,7 @@ async def get_specific_game(gameId: int,user=Depends(manager)):
         result = game.to_dict()
     return result
 
-@router.get("/{gameId}/join")
+@router.post("/{gameId}/join")
 async def join_game(gameId: int,user=Depends(manager)):
     with db_session:
         game = Game.get(id=gameId)
