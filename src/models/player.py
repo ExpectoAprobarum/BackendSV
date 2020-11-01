@@ -3,11 +3,11 @@ from pony.orm import PrimaryKey, Required, Set, Optional
 
 class Player(db.Entity):
     id = PrimaryKey(int, auto=True)
-    choosable = Required(bool)
+    choosable = Optional(bool)
     current_position = Optional(str)
-    role = Required(str)
-    is_voldemort = Required(bool)
+    role = Optional(str)
+    is_voldemort = Optional(bool)
     alive = Required(bool)
     user = Required('User')
-    games = Set('Game')
+    game = Optional('Game')
     chats = Set('Message')
