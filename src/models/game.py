@@ -6,6 +6,7 @@ class Game(db.Entity):
     id = PrimaryKey(int, auto=True)
     name = Required(str)
     creation_date = Required(datetime.datetime)
+    created_by = Required(int)
     player_amount = Required(int)
     started = Required(bool)
     status = Required(Json)
