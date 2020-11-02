@@ -1,8 +1,9 @@
 from fastapi import FastAPI
+from fastapi import Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_login.exceptions import InvalidCredentialsException
+from fastapi.middleware.cors import CORSMiddleware
 from src.views import games,users
-from fastapi import Depends
 from src.services import manager,load_user
 from pydantic import BaseModel
 from datetime import timedelta
@@ -13,9 +14,17 @@ class UserM(BaseModel):
     username: str
     password: str
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.get('/')
 async def index():
-    return {'app_name' : 'Secret Voldemort', 'version' : '1.0'} 
+    return {'app_name' : 'Secret Voldemort', 'version' : '1.0'}
 
 @app.post('/auth/token')
 async def login(data: UserM):
