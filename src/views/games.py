@@ -323,7 +323,7 @@ async def play(proc: ProcM, gameId: int, user=Depends(manager)):
 
         return {"message": msg}
         
-@router.post("/{gameId}/end")
+@router.delete("/{gameId}/delete")
 async def end_game(gameId: int, user=Depends(manager)):
     status = {}
     with db_session:
@@ -332,7 +332,7 @@ async def end_game(gameId: int, user=Depends(manager)):
             raise HTTPException(status_code=404, detail="The game does not exist")
         if currentGame.created_by != user["id"]:
             raise HTTPException(status_code=403, detail="The game does not belong to the current user")
-        gName = currentGame
+        gName = currentGame.name
         currentGame.delete()
     return {"message": f"The game {gameId} ({gName}) was deleted"}
 
