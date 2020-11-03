@@ -340,7 +340,20 @@ async def end_game(gameId: int, user=Depends(manager)):
         currentGame.delete()
     return {"message": f"The game {gameId} ({gName}) was deleted"}
 
+@router.get("/{gameId}/me")
+async def get_current_player(gameId: int, user=Depends(manager)):
+   with db_session:
+        game = Game.get(id=gameId)
+        if game is None:
+            raise HTTPException(status_code=404, detail="The game does not exist")
 
+        playerQuery = Player.select(lambda p: user["id"]==p.user.id and p.game.id == gameId)
+        currentPlayerArray = [p.to_dict() for p in playerQuery]
+        if (currentPlayerArray == []):
+            raise HTTPException(status_code=400, detail="The player does not belong to this game")
+        currentPlayer = currentPlayerArray[0]
+
+        return currentPlayer
 
 
 
