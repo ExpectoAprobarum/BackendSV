@@ -333,6 +333,10 @@ async def end_game(gameId: int, user=Depends(manager)):
         if currentGame.created_by != user["id"]:
             raise HTTPException(status_code=403, detail="The game does not belong to the current user")
         gName = currentGame.name
+        players = currentGame.players
+        for p in players:
+            p.delete()
+        currentGame.board.delete()
         currentGame.delete()
     return {"message": f"The game {gameId} ({gName}) was deleted"}
 
