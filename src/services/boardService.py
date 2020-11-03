@@ -79,7 +79,7 @@ def reasignMinister(Player, game):
     playersArray = [p.id for p in playerSet]
     ministerId = game.status["minister"]
 
-    if game.board.de_proc == 3:
+    if game.board.de_proc == 6:
         game.status = {"info": "game ended","winner": "Death Eaters"}
     elif game.board.po_proc == 5:
         game.status = {"info": "game ended","winner": "Phoenix Order"}
