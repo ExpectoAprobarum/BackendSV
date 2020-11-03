@@ -45,3 +45,4 @@ async def login(data: UserM):
 
 app.include_router(games.router, prefix="/games")
 app.include_router(users.router, prefix="/users")
+

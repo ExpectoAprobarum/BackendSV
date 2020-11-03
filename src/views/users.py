@@ -34,3 +34,7 @@ async def get_games(user=Depends(manager)):
         users = User.select()[:]
         result = {'data': [{"id":u.id,"email":u.email,"username":u.username} for u in users]}
         return result
+
+@router.get("/me")
+async def get_games(user=Depends(manager)):
+    return {"id":user["id"],"username":user["username"],"email":user["email"]}

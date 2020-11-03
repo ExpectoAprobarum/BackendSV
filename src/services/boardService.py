@@ -1,5 +1,7 @@
 import random
 
+##REFACTOR ALL THIS FILE INTO MODEL CLASS FUNCTIONS
+
 def defineBoard(player_amount):
     fiveSixPlayers = ['','','divination','avadakedavra','avadakedavra','win']
     sevenEightPlayers = ['','crucio','imperio','avadakedavra','avadakedavra','win']
@@ -71,6 +73,31 @@ def assignRoles(playerSet, Player):
                 Player[playersArray[idx]].role = "death eater"
 
     return ministerId
+
+def reasignMinister(Player, game):
+    playerSet = game.players
+    playersArray = [p.id for p in playerSet]
+    ministerId = game.status["minister"]
+
+    if game.board.de_proc == 3:
+        game.status = {"info": "game ended","winner": "Death Eaters"}
+    elif game.board.po_proc == 5:
+        game.status = {"info": "game ended","winner": "Phoenix Order"}
+    else:
+        for i, mId in enumerate(playersArray):
+            if mId == ministerId:
+                if (i + 1) == len(playersArray):
+                    game.status["minister"] = playersArray[0]
+                else:
+                    game.status["minister"] = playersArray[i + 1]
+                game.status["phase"] = "propose"
+                game.status["round"] += 1
+                firedMinister = Player.get(id=ministerId)
+                firedMinister.current_position = ""
+                newMinister = Player.get(id=game.status["minister"])
+                newMinister.current_position = "minister"
+
+                break
 
 
 
