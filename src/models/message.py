@@ -1,6 +1,7 @@
 import datetime
-from pony.orm import PrimaryKey, Required, Set, Json, LongStr
+from pony.orm import PrimaryKey, Required, LongStr
 from .base import db
+
 
 class Message(db.Entity):
     id = PrimaryKey(int, auto=True)
