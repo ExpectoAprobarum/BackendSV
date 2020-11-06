@@ -242,8 +242,8 @@ async def vote(vote: VoteM, gameId: int, user=Depends(manager)):
         return {"vote":playerMsg,"election":generalMsg}
 
 
-@router.post("/{gameId}/avadakedavra/{userId}")
-async def kill_player(gameId: int, userId: int, user=Depends(manager)):
+@router.post("/{gameId}/avadakedavra/{playerId}")
+async def kill_player(gameId: int, playerId: int, user=Depends(manager)):
     status = {}
     with db_session:
         game = Game.get(id=gameId)
@@ -251,9 +251,9 @@ async def kill_player(gameId: int, userId: int, user=Depends(manager)):
             raise HTTPException(status_code=404, detail="Game not found")
         if game.status["phase"] != "spell play":
             raise HTTPException(status_code=400, detail="You don't have spells to play")
-        cant_proc = game.board.po_proc + game.board.de_proc
+        cant_proc = (game.board.po_proc + game.board.de_proc)-1
         spellsArray = game.board.spell_fields.split(",")
-        if not spellsArray[cant_proc]:
+        if spellsArray[cant_proc] != 'avadakedavra':
             raise HTTPException(status_code=400, detail="You don't have avada kedavra to play")
         playerQuery = Player.select(lambda p: user["id"]==p.user.id and p.game.id == gameId and p.current_position == "minister")
         currentPlayerArray = [p.to_dict() for p in playerQuery]
@@ -264,17 +264,14 @@ async def kill_player(gameId: int, userId: int, user=Depends(manager)):
                 raise HTTPException(status_code=404, detail="This player is not the minister")
         if userId == user["id"]:
             raise HTTPException(status_code=400, detail="You aren't allowed to kill this user")
-        playerQuery = Player.select(lambda p: userId==p.user.id and p.game.id == gameId)
-        playerToBeKilledArray = [p.to_dict() for p in playerQuery]
+        playerQuery = Player.select(lambda p: playerId==p.id and p.game.id == gameId)
+        playerToBeKilledArray = [p.copy() for p in playerQuery]
         if not playerToBeKilledArray:
             raise HTTPException(status_code=400, detail="The player to be killed does not belong to this game")
         playerToBeKilled = playerToBeKilledArray[0]
-        playerToBeKilled["alive"] = False
+        playerToBeKilled.alive = False
         reasignMinister(Player, game)
-        user = User.get(id=userId).to_dict()
-        user.pop("password")
-        user.pop("email")
-        return {"avadakedavra": "succed!", "dead_user": user}
+        return {"avadakedavra": "succed!", "player_id": playerId , "dead_player": playerToBeKilled.user.username}
 
 @router.get("/{gameId}/proclamations")
 async def get_proclamations(gameId: int, user=Depends(manager)):
@@ -347,7 +344,7 @@ async def play(proc: ProcM, gameId: int, user=Depends(manager)):
                     game.board.de_proc += 1
                 #IMPORTANT! HERE GOES THE LOGIC FOR SPELL ACTIVATION
                 ########### PASS THE TURN ###########
-                cant_proc = game.board.po_proc + game.board.de_proc
+                cant_proc = (game.board.po_proc + game.board.de_proc)-1
                 spellsArray = game.board.spell_fields.split(",")
                 if not spellsArray[cant_proc]:
                     reasignMinister(Player, game)
