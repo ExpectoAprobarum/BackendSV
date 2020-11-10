@@ -62,7 +62,6 @@ def test_join_game():
         'Authorization': 'Bearer ' + u["token"],
         'Content-Type': 'text/plain'
         }
-        print('Bearer ' + u["token"])
         response = client.post("/games/1/join", headers=headers, json={})
         assert response.status_code == 200
         assert response.json() == {"message": 'joined successfully'}
@@ -73,27 +72,45 @@ def test_join_game():
     assert response.status_code == 403
     assert response.json() == {"detail": 'The game is full'}
 
-"""
-def test_get_game():
+
+def test_start_game():
     headers = {
-    'Authorization': 'Bearer ' + pytest.users[1]["token"],
+    'Authorization': 'Bearer ' + pytest.users[2]["token"],
     'Content-Type': 'text/plain'
     }
-    response = client.get("/games/", headers=headers)
+    response = client.post("/games/1/start", headers=headers)
+    assert response.status_code == 403
+    assert response.json() == {
+        'detail': "The game does not belong to the current user"
+        }
+    headers['Authorization'] = 'Bearer ' + pytest.users[1]["token"]
+    response = client.post("/games/1/start", headers=headers)
     assert response.status_code == 200
-    
+    assert response.json() == {
+        'board_id': 1,
+        'message': 'Game started successfully'
+        }
+    response = client.post("/games/100/start", headers=headers)
+    assert response.status_code == 404
+    assert response.json() == {'detail': "The game does not exist"}
+    response = client.post("/games/1/start", headers=headers)
+    assert response.status_code == 400
+    assert response.json() == {'detail': "The game was already started"}
 
-def test_create_games():
-    response = client.post(
-        "/games/", headers={"X-Token": "coneofsilence"},
-        json={"name": "Juego 1", "player_amount": 5}
+
+
+def test_get_games():
+    headers = {
+    'Authorization': 'Bearer ' + pytest.users[2]["token"],
+    'Content-Type': 'text/plain'
+    }
+    response = client.get(
+        "/games/", headers=headers,
+        json={}
     )
     assert response.status_code == 200
-    g = response.json()
-    assert type(g["id"]) is int
-    assert type(g["message"]) is str
 
-
+"""
 def test_start_game():
     response = client.post(
         "/games/7/start",
