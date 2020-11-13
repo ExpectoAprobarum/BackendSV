@@ -326,7 +326,12 @@ async def play(proc: ProcM, game_id: int, user=Depends(manager)):
                     game.board.de_proc += 1
                 # IMPORTANT! HERE GOES THE LOGIC FOR SPELL ACTIVATION
                 # PASS THE TURN ###########
-                game.status["phase"] = "spell play"
+                spell_fields = game.board.spell_fields.split(",")
+                spells = ["divination", "avadakedavra"]
+                if game.board.de_proc != 0 and spell_fields[game.board.de_proc - 1] in spells:
+                    game.status["phase"] = "spell play"
+                else:
+                    Player.reassign_minister(game)
                 #####################################
                 msg = f'{proc.card} card played successfully'
             else:
