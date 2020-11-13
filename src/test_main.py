@@ -7,11 +7,11 @@ from pony.orm import db_session
 client = TestClient(app)
 
 pytest.users = {
-    1: {"username": "andres", "email": "a@a.com", "password": "12345"},
-    2: {"username": "andres2", "email": "a2@a.com", "password": "12345"},
-    3: {"username": "andres3", "email": "a3@a.com", "password": "12345"},
-    4: {"username": "andres4", "email": "a4@a.com", "password": "12345"},
-    5: {"username": "andres5", "email": "a5@a.com", "password": "12345"}
+    1: {"username": "andres", "useralias": "andres", "email": "a@a.com", "password": "12345"},
+    2: {"username": "andres2", "useralias": "andres2", "email": "a2@a.com", "password": "12345"},
+    3: {"username": "andres3", "useralias": "andres3", "email": "a3@a.com", "password": "12345"},
+    4: {"username": "andres4", "useralias": "andres4", "email": "a4@a.com", "password": "12345"},
+    5: {"username": "andres5", "useralias": "andres5", "email": "a5@a.com", "password": "12345"}
     }
 
 
@@ -19,7 +19,7 @@ def test_create_user():
     for i,u in enumerate(pytest.users.values()):
         response = client.post(
             "/users/", headers={},
-            json={"username": u['username'], "email": u['email'], "password": "12345"}
+            json={"username": u['username'], "useralias": u["useralias"], "email": u['email'], "password": "12345"}
         )
         assert response.status_code == 200
         rjson = response.json()
@@ -32,7 +32,7 @@ def test_create_user():
     assert response.json() == {"detail": "Username already registered"}
     response = client.post(
         "/users/", headers={},
-        json={"username": "andres345", "email": "a@a.com", "password": "12345"}
+        json={"username": "andres345", "useralias": "andres234", "email": "a@a.com", "password": "12345"}
     )
     assert response.status_code == 400
     assert response.json() == {"detail": "Email already registered"}
