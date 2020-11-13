@@ -56,6 +56,7 @@ class Player(db.Entity):
     def reassign_minister(game):
         player_set = game.players
         players_array = [p.id for p in player_set]
+        players_array.sort()
         minister_id = game.status["minister"]
 
         if game.board.de_proc == 6:
