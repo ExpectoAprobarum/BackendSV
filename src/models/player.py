@@ -4,6 +4,13 @@ from pony.orm import PrimaryKey, Required, Set, Optional
 from fastapi import HTTPException
 
 
+def fire_headmaster(game):
+    player_query = Player.select(lambda pr: pr.current_position == 'headmaster')
+    game.status["headmaster"] = ""
+    for p in player_query:
+        p.current_position = ""
+
+
 class Player(db.Entity):
     id = PrimaryKey(int, auto=True)
     choosable = Optional(bool)
@@ -64,11 +71,14 @@ class Player(db.Entity):
                         game.status["minister"] = players_array[i + 1]
                     game.status["phase"] = "propose"
                     game.status["round"] += 1
+
                     fired_minister = Player.get(id=minister_id)
                     fired_minister.current_position = ""
+
                     new_minister = Player.get(id=game.status["minister"])
                     new_minister.current_position = "minister"
 
+                    fire_headmaster(game)
                     break
 
     @staticmethod
@@ -78,3 +88,9 @@ class Player(db.Entity):
         if not current_player_array:
             raise HTTPException(status_code=400, detail="The player does not belong to this game")
         return current_player_array[0]
+
+    @staticmethod
+    def reset_choosable():
+        player_query = Player.select(lambda p: not p.choosable)
+        for p in player_query:
+            p.choosable = True

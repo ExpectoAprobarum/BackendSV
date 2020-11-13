@@ -198,14 +198,20 @@ async def choose_headmaster(headmaster: PlayerM, game_id: int, user=Depends(mana
             raise HTTPException(status_code=400, detail="The selected player does not exist")
         if new_hm.id == status["minister"]:
             raise HTTPException(status_code=400, detail="The minister can not be the headmaster")
+        if not new_hm.choosable:
+            raise HTTPException(status_code=400, detail="The player has been headmaster in the previous round")
         if new_hm.game.id != game_id:
             raise HTTPException(status_code=400, detail="The player does not belong to this game")
+        if not new_hm.choosable:
+            raise HTTPException(status_code=400, detail="The player cannot be headmaster in this round")
+        Player.reset_choosable()
         status["headmaster"] = headmaster.id
         # PASS THE TURN ####################
         status["phase"] = "vote"
         #####################################
         game.status = status
         new_hm.current_position = "headmaster"
+        new_hm.choosable = False
         return {"message": f'The player number {new_hm.id}: {new_hm.user.username} was proposed as headmaster'}
 
 
@@ -247,7 +253,7 @@ async def vote(in_vote: VoteM, game_id: int, user=Depends(manager)):
             if lumos_votes > nox_votes:
                 # PASS THE TURN ######################
                 game.status["phase"] = "minister play"
-                general_msg = "election succed"
+                general_msg = "election succeed"
                 ######################################
             else:
                 # PASS THE TURN #####################
@@ -256,7 +262,6 @@ async def vote(in_vote: VoteM, game_id: int, user=Depends(manager)):
                 Player.reassign_minister(game)
                 # WRITE ACTIONS TO DO IF CAOS IS EQUAL TO 5
                 #####################################
-            del game.status["votes"]
         return {"vote": player_msg, "election": general_msg}
 
 
@@ -321,7 +326,7 @@ async def play(proc: ProcM, game_id: int, user=Depends(manager)):
                     game.board.de_proc += 1
                 # IMPORTANT! HERE GOES THE LOGIC FOR SPELL ACTIVATION
                 # PASS THE TURN ###########
-                Player.reassign_minister(game)
+                game.status["phase"] = "spell play"
                 #####################################
                 msg = f'{proc.card} card played successfully'
             else:
@@ -358,3 +363,23 @@ async def get_current_player(game_id: int, user=Depends(manager)):
             raise HTTPException(status_code=404, detail="The game does not exist")
 
         return Player.user_player(user, game_id)
+
+
+@router.get("/{game_id}/divination")
+async def play_divination(game_id: int, user=Depends(manager)):
+    with db_session:
+        game = Game.get(id=game_id)
+        current_player = Player.user_player(user, game_id)
+        deck = game.board.spell_fields.split(",")
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        if not game.started:
+            raise HTTPException(status_code=400, detail="Game is not started")
+        if game.status["phase"] != "spell play":
+            raise HTTPException(status_code=400, detail="Its not time for playing spells!")
+        if current_player["current_position"] != "minister":
+            raise HTTPException(status_code=400, detail=f"This player is not the minister")
+        if game.board.de_proc == 0 or deck[game.board.de_proc - 1] != "divination":
+            raise HTTPException(status_code=400, detail="The divination spell is not available")
+        Player.reassign_minister(game)
+        return {"data": game.board.deck.split(",")[:3]}
