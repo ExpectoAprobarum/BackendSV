@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
 from .main import app
 import pytest
+from src.models import Game, Board, User, Player
+from pony.orm import db_session
 
 client = TestClient(app)
 
@@ -44,6 +46,7 @@ def test_auth():
         rjson = response.json()
         assert rjson['token_type'] == 'bearer'
         u["token"] = rjson['access_token']
+        print(u["token"])
 
 def test_create_game():
     headers = {
@@ -73,6 +76,33 @@ def test_join_game():
     assert response.json() == {"detail": 'The game is full'}
 
 
+def test_get_games():
+    headers = {
+    'Authorization': 'Bearer ' + pytest.users[2]["token"],
+    'Content-Type': 'text/plain'
+    }
+    response = client.get(
+        "/games/", headers=headers,
+        json={}
+    )
+    with db_session:
+        creation_data = str(Game.get(id=1).creation_date).replace(" ","T")
+    print(creation_data)
+    assert response.status_code == 200
+    print(response.json())
+    assert response.json() == {
+    "data": [
+            {"id": 1,
+            "name": "Partida 1",
+            "creation_date": creation_data,
+            "created_by": 1,
+            "player_amount": 5,
+            "started": False,
+            "status": {},
+            "board": None
+        }]}
+
+
 def test_start_game():
     headers = {
     'Authorization': 'Bearer ' + pytest.users[2]["token"],
@@ -96,25 +126,3 @@ def test_start_game():
     response = client.post("/games/1/start", headers=headers)
     assert response.status_code == 400
     assert response.json() == {'detail': "The game was already started"}
-
-
-
-def test_get_games():
-    headers = {
-    'Authorization': 'Bearer ' + pytest.users[2]["token"],
-    'Content-Type': 'text/plain'
-    }
-    response = client.get(
-        "/games/", headers=headers,
-        json={}
-    )
-    assert response.status_code == 200
-
-"""
-def test_start_game():
-    response = client.post(
-        "/games/7/start",
-        headers={"X-Token": "coneofsilence"}
-    )
-    assert response.status_code == 200
-"""
