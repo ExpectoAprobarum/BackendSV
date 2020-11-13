@@ -17,7 +17,8 @@ class UserM(BaseModel):
 
 class UserMod(BaseModel):
     useralias: Optional[str] = None
-    password: Optional[str] = None
+    oldpassword: Optional[str] = None
+    newpassword: Optional[str] = None
 
 
 @router.post("/")
@@ -48,9 +49,13 @@ async def new_user(input_game: UserMod, user=Depends(manager)):
         if input_game.useralias:
             user.useralias = input_game.useralias
             message += " -useralias"
-        if input_game.password:
-            user.password = input_game.password
-            message += " -password"
+        if input_game.newpassword:
+            if input_game.oldpassword and user.password == input_game.oldpassword:
+                user.password = input_game.newpassword
+                message += " -password"
+            else:
+                raise HTTPException(status_code=400, detail="Old password dont match")
+
         return {message}
 
 
