@@ -2,6 +2,7 @@ from .base import db
 import datetime
 from pony.orm import PrimaryKey, Required, Optional, Set, Json
 
+
 class Game(db.Entity):
     id = PrimaryKey(int, auto=True)
     name = Required(str)
@@ -13,4 +14,3 @@ class Game(db.Entity):
     board = Optional('Board')
     players = Set('Player')
     chats = Set('Message')
-

@@ -1,26 +1,29 @@
 import datetime
-import json
 from pony.orm import db_session, commit
-from fastapi import APIRouter, Request, Response, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from src.models import db,Game,Board,User,Player
-from src.services import manager,defineBoard,newDeck,assignRoles,reasignMinister
-from random import randrange
+from src.models import Game, Board, User, Player
+from src.services import manager
 
 router = APIRouter()
+
 
 class GameM(BaseModel):
     name: str
     player_amount: int
 
+
 class PlayerM(BaseModel):
     id: str
+
 
 class VoteM(BaseModel):
     vote: bool
 
+
 class ProcM(BaseModel):
     card: str
+
 
 @router.get("/")
 async def get_games(user=Depends(manager)):
@@ -28,84 +31,107 @@ async def get_games(user=Depends(manager)):
         games = Game.select()[:]
         result = {'data': [g.to_dict() for g in games if not g.started]}
     return result
-    
+
+
 @router.post("/")
-async def create_game(inputGame: GameM, user=Depends(manager)):
-    status = {}
+async def create_game(input_game: GameM, user=Depends(manager)):
     with db_session:
-        newGame = Game(name=inputGame.name, created_by = user["id"], started=False, creation_date=datetime.datetime.now(), player_amount=inputGame.player_amount, status={})
-        newPlayer = Player(choosable=True, current_position = '', role = '', is_voldemort = False, alive = True, user = User[user["id"]])
-        newGame.players.add(newPlayer)
-        newPlayer.game = newGame
+        new_game = Game(name=input_game.name, created_by=user["id"], started=False,
+                        creation_date=datetime.datetime.now(),
+                        player_amount=input_game.player_amount, status={})
+        new_player = Player(choosable=True, current_position='', role='', is_voldemort=False, alive=True,
+                            user=User[user["id"]])
+        new_game.players.add(new_player)
+        new_player.game = new_game
         commit()
-        status = {'id': newGame.id, 'message': 'Game created succesfully'}
+        status = {'id': new_game.id, 'message': 'Game created successfully'}
     return status
 
-@router.get("/{gameId}")
-async def get_specific_game(gameId: int,user=Depends(manager)):
+
+@router.get("/{game_id}")
+async def get_specific_game(game_id: int, user=Depends(manager)):
     with db_session:
-        game = Game.get(id=gameId)
+        game = Game.get(id=game_id)
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
         result = game.to_dict()
     return result
 
-@router.post("/{gameId}/start")
-async def start_game(gameId: int, user=Depends(manager)):
+
+@router.post("/{game_id}/start")
+async def start_game(game_id: int, user=Depends(manager)):
     status = {}
     with db_session:
-        currentGame=Game.get(id=gameId)
-        #IMPORTANT!!!:
-        #Currently this is not checking that the game is full before continue (for testing purposes)
+        current_game = Game.get(id=game_id)
+        # IMPORTANT!!!:
+        # Currently this is not checking that the game is full before continue (for testing purposes)
 
-        if currentGame is None:
+        if current_game is None:
             raise HTTPException(status_code=404, detail="The game does not exist")
-        if currentGame.started:
+        if current_game.started:
             raise HTTPException(status_code=400, detail="The game was already started")
-        if currentGame.created_by != user["id"]:
+        if current_game.created_by != user["id"]:
             raise HTTPException(status_code=403, detail="The game does not belong to the current user")
-        
-        #spell board and random deck
-        spellFields = ','.join(defineBoard(currentGame.player_amount))
-        randomDeck = ','.join(newDeck(15))
 
-        newBoard = Board(de_proc=0,po_proc=0,spell_fields=spellFields,caos=0, game=currentGame, deck = randomDeck)
-        currentGame.started = True
-        currentGame.board = newBoard
+        # spell board and random deck
+        spell_fields = ','.join(Board.define_board(current_game.player_amount))
+        random_deck = ','.join(Board.new_deck(15))
 
-        #Role choosing
-        roleInfo = assignRoles(currentGame.players, Player)
+        new_board = Board(de_proc=0, po_proc=0, spell_fields=spell_fields, caos=0, game=current_game, deck=random_deck)
+        current_game.started = True
+        current_game.board = new_board
 
-        currentGame.status = {
+        # Role choosing
+        role_info = Player.assign_roles(current_game.players)
+
+        current_game.status = {
             "round": 1,
             "phase": 'propose',
-            "minister": roleInfo,
+            "minister": role_info,
         }
-        
+
         commit()
 
-        status = {'board_id': newBoard.id, 'message': 'Game started succesfully'}
+        status = {'board_id': new_board.id, 'message': 'Game started successfully'}
     return status
 
-@router.post("/{gameId}/join")
-async def join_game(gameId: int,user=Depends(manager)):
+
+@router.post("/{game_id}/join")
+async def join_game(game_id: int, user=Depends(manager)):
     with db_session:
-        game = Game.get(id=gameId)
+        game = Game.get(id=game_id)
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
-        newPlayer = Player(choosable=True, current_position = '', role = '', is_voldemort = False, alive = True, user = User[user["id"]])
         if game.players.count() == game.player_amount:
             raise HTTPException(status_code=403, detail="The game is full")
-        newPlayer = Player(choosable=True, current_position = '', role = '', is_voldemort = False, alive = True, user = User[user["id"]])
-        newPlayer.game = game
-        game.players.add(newPlayer)
-    return {"message": 'joined succesfully'}
+        new_player = Player(choosable=True, current_position='', role='', is_voldemort=False, alive=True,
+                            user=User[user["id"]])
+        new_player.game = game
+        game.players.add(new_player)
+    return {"message": 'joined successfully'}
 
-@router.get("/{gameId}/players")
-async def list_players(gameId: int,user=Depends(manager)):
+
+@router.post("/{game_id}/exit")
+async def left_game(game_id: int, user=Depends(manager)):
+    with db_session:
+        game = Game.get(id=game_id)
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        if game.started:
+            raise HTTPException(status_code=400, detail="The is already started")
+
+        current_player = Player.user_player(user, game_id)
+        player_obj = Player.get(id=current_player["id"])
+        player_obj.delete()
+
+    return {"message": 'game left successfully'}
+
+
+@router.get("/{game_id}/players")
+async def list_players(game_id: int, user=Depends(manager)):
     status = {}
     with db_session:
-        game = Game.get(id=gameId)
+        game = Game.get(id=game_id)
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
         players = game.players
@@ -116,20 +142,22 @@ async def list_players(gameId: int,user=Depends(manager)):
             user.pop("email")
             p.update(user=user)
     return status
-    
-@router.get("/{gameId}/status")
-async def get_status(gameId: int,user=Depends(manager)):
+
+
+@router.get("/{game_id}/status")
+async def get_status(game_id: int, user=Depends(manager)):
     with db_session:
-        game = Game.get(id=gameId)
+        game = Game.get(id=game_id)
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
         status = game.status.copy()
         return status
 
-@router.get("/{gameId}/board")
-async def get_board(gameId: int,user=Depends(manager)):
+
+@router.get("/{game_id}/board")
+async def get_board(game_id: int, user=Depends(manager)):
     with db_session:
-        game = Game.get(id=gameId)
+        game = Game.get(id=game_id)
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
         if not game.started:
@@ -139,32 +167,22 @@ async def get_board(gameId: int,user=Depends(manager)):
         board["spell_fields"] = spell_fields.split(",")
         return board
 
-@router.get("/{gameId}/deck")
-async def get_deck(gameId: int, user=Depends(manager)):
-    status = {}
+
+@router.get("/{game_id}/deck")
+async def get_deck(game_id: int, user=Depends(manager)):
     with db_session:
-        game = Game.get(id=gameId)
+        game = Game.get(id=game_id)
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
         if not game.started:
             raise HTTPException(status_code=400, detail="Game is not started")
         return game.board.deck
 
-@router.get("/{gameId}/deck")
-async def get_deck(gameId: int, user=Depends(manager)):
-    status = {}
-    with db_session:
-        game = Game.get(id=gameId)
-        if game is None:
-            raise HTTPException(status_code=404, detail="Game not found")
-        if not game.started:
-            raise HTTPException(status_code=400, detail="Game is not started")
-        return game.board.deck
 
-@router.post("/{gameId}/choosehm")
-async def choose_headmaster(headmaster: PlayerM, gameId: int, user=Depends(manager)):
+@router.post("/{game_id}/choosehm")
+async def choose_headmaster(headmaster: PlayerM, game_id: int, user=Depends(manager)):
     with db_session:
-        game = Game.get(id=gameId)
+        game = Game.get(id=game_id)
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
         if not game.started:
@@ -175,72 +193,196 @@ async def choose_headmaster(headmaster: PlayerM, gameId: int, user=Depends(manag
             raise HTTPException(status_code=400, detail="The headmaster only can be elected in the propose phase")
         if player.user.id != user["id"]:
             raise HTTPException(status_code=400, detail="Only the minister can propose a headmaster")
-        newHM = Player.get(id=headmaster.id)
-        if newHM is None:
+        new_hm = Player.get(id=headmaster.id)
+        if new_hm is None:
             raise HTTPException(status_code=400, detail="The selected player does not exist")
-        if newHM.id == status["minister"]:
+        if new_hm.id == status["minister"]:
             raise HTTPException(status_code=400, detail="The minister can not be the headmaster")
-        if newHM.game.id != gameId:
+        if not new_hm.choosable:
+            raise HTTPException(status_code=400, detail="The player has been headmaster in the previous round")
+        if new_hm.game.id != game_id:
             raise HTTPException(status_code=400, detail="The player does not belong to this game")
+        if not new_hm.choosable:
+            raise HTTPException(status_code=400, detail="The player cannot be headmaster in this round")
+        Player.reset_choosable()
         status["headmaster"] = headmaster.id
-        ########### PASS THE TURN ###########
+        # PASS THE TURN ####################
         status["phase"] = "vote"
         #####################################
         game.status = status
-        newHM.current_position = "headmaster"
-        return {"message": f'The player number {newHM.id}: {newHM.user.username} was proposed as headmaster'}
-        
-@router.post("/{gameId}/vote")
-async def vote(vote: VoteM, gameId: int, user=Depends(manager)):
+        new_hm.current_position = "headmaster"
+        new_hm.choosable = False
+        return {"message": f'The player number {new_hm.id}: {new_hm.user.username} was proposed as headmaster'}
+
+
+@router.post("/{game_id}/vote")
+async def vote(in_vote: VoteM, game_id: int, user=Depends(manager)):
     with db_session:
-        game = Game.get(id=gameId)
+        game = Game.get(id=game_id)
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
         if game.status["phase"] != "vote":
             raise HTTPException(status_code=400, detail="It is not the vote phase")
 
-        playerQuery = Player.select(lambda p: user["id"]==p.user.id and p.game.id == gameId)
-        currentPlayerArray = [p.to_dict() for p in playerQuery]
-        if (currentPlayerArray == []):
-            raise HTTPException(status_code=400, detail="The player does not belong to this game")
-        
-        currentPlayer = currentPlayerArray[0]
-        voteArr = [{"player": currentPlayer["id"] , "user": user["id"], "username": user["username"], "vote": vote.vote}]
+        current_player = Player.user_player(user, game_id)
+        vote_arr = [{"player": current_player["id"],
+                     "user": user["id"],
+                     "username": user["username"],
+                     "vote": in_vote.vote}]
+
         if 'votes' in game.status.keys():
             for v in game.status["votes"]:
                 if v["user"] == user["id"]:
                     raise HTTPException(status_code=400, detail="This player already voted")
-            game.status["votes"] = game.status["votes"] + voteArr
+            game.status["votes"] = game.status["votes"] + vote_arr
         else:
-            game.status["votes"] = voteArr
-        
-        pid = currentPlayer["id"]
+            game.status["votes"] = vote_arr
+
+        pid = current_player["id"]
         username = user["username"]
-        playerMsg = f"Player: {pid} ({username}) succesfully voted"
-        generalMsg = "election in progress"
+        player_msg = f"Player: {pid} ({username}) successfully voted"
+        general_msg = "election in progress"
         if len(game.status["votes"]) == game.players.count():
-            noxVotes = 0
-            lumosVotes = 0
+            nox_votes = 0
+            lumos_votes = 0
             for v in game.status["votes"]:
                 if v["vote"]:
-                    lumosVotes += 1
+                    lumos_votes += 1
                 else:
-                    noxVotes += 1
-            if lumosVotes > noxVotes:
-                ########### PASS THE TURN ###########
+                    nox_votes += 1
+            if lumos_votes > nox_votes:
+                # PASS THE TURN ######################
                 game.status["phase"] = "minister play"
-                generalMsg = "election succed"
-                #####################################
+                general_msg = "election succeed"
+                ######################################
             else:
-                ########### PASS THE TURN ###########
+                # PASS THE TURN #####################
                 game.board.caos = game.board.caos + 1
-                generalMsg = "election failed"
-                reasignMinister(Player, game)
-                #WRITE ACTIONS TO DO IF CAOS IS EQUAL TO 5
+                general_msg = "election failed"
+                Player.reassign_minister(game)
+                # WRITE ACTIONS TO DO IF CAOS IS EQUAL TO 5
                 #####################################
-            del game.status["votes"]
-        return {"vote":playerMsg,"election":generalMsg}
+        return {"vote": player_msg, "election": general_msg}
 
+
+@router.get("/{game_id}/proclamations")
+async def get_proclamations(game_id: int, user=Depends(manager)):
+    with db_session:
+        game = Game.get(id=game_id)
+
+        current_player = Player.user_player(user, game_id)
+
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        if game.status["phase"] == "minister play":
+            if current_player["current_position"] != "minister":
+                raise HTTPException(status_code=404, detail="This player is not the minister")
+            cards = game.board.deck.split(',')[:3]
+            data = {"data": cards}
+        elif game.status["phase"] == "headmaster play":
+            if current_player["current_position"] != "headmaster":
+                raise HTTPException(status_code=404, detail="This player is not the headmaster")
+            cards = game.board.deck.split(',')[:2]
+            data = {"data": cards}
+        else:
+            raise HTTPException(status_code=400, detail="It is not a phase for geting a proclamation")
+        return data
+
+
+@router.post("/{game_id}/proclamations")
+async def play(proc: ProcM, game_id: int, user=Depends(manager)):
+    with db_session:
+        game = Game.get(id=game_id)
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+
+        current_player = Player.user_player(user, game_id)
+
+        if game.status["phase"] == "minister play":
+            if current_player["current_position"] != "minister":
+                raise HTTPException(status_code=404, detail="This player is not the minister")
+            cards = game.board.deck.split(',')[:3]
+            if proc.card in cards:
+                cards = game.board.deck.split(',')
+                cards.remove(proc.card)
+                game.board.deck = ','.join(cards)
+            else:
+                raise HTTPException(status_code=400, detail="The input card was not one of the options")
+            msg = f'{proc.card} card discarded successfully'
+            # PASS THE TURN #####################
+            game.status["phase"] = "headmaster play"
+            #####################################
+
+        elif game.status["phase"] == "headmaster play":
+            if current_player["current_position"] != "headmaster":
+                raise HTTPException(status_code=404, detail="This player is not the headmaster")
+            cards = game.board.deck.split(',')[:2]
+            if proc.card in cards:
+                cards = game.board.deck.split(',')[2:]
+                game.board.deck = ','.join(cards)
+                if proc.card == 'phoenix':
+                    game.board.po_proc += 1
+                else:
+                    game.board.de_proc += 1
+                # IMPORTANT! HERE GOES THE LOGIC FOR SPELL ACTIVATION
+                # PASS THE TURN ###########
+                game.status["phase"] = "spell play"
+                #####################################
+                msg = f'{proc.card} card played successfully'
+            else:
+                raise HTTPException(status_code=400, detail="The input card was not one of the options")
+
+        else:
+            raise HTTPException(status_code=400, detail="It is not a phase for playing a proclamation")
+
+        return {"message": msg}
+
+
+@router.delete("/{game_id}/delete")
+async def end_game(game_id: int, user=Depends(manager)):
+    with db_session:
+        current_game = Game.get(id=game_id)
+        if current_game is None:
+            raise HTTPException(status_code=404, detail="The game does not exist")
+        if current_game.created_by != user["id"]:
+            raise HTTPException(status_code=403, detail="The game does not belong to the current user")
+        g_name = current_game.name
+        players = current_game.players
+        for p in players:
+            p.delete()
+        current_game.board.delete()
+        current_game.delete()
+        return {"message": f"The game {game_id} ({g_name}) was deleted"}
+
+
+@router.get("/{game_id}/me")
+async def get_current_player(game_id: int, user=Depends(manager)):
+    with db_session:
+        game = Game.get(id=game_id)
+        if game is None:
+            raise HTTPException(status_code=404, detail="The game does not exist")
+
+        return Player.user_player(user, game_id)
+
+
+@router.get("/{game_id}/divination")
+async def play_divination(game_id: int, user=Depends(manager)):
+    with db_session:
+        game = Game.get(id=game_id)
+        current_player = Player.user_player(user, game_id)
+        deck = game.board.spell_fields.split(",")
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        if not game.started:
+            raise HTTPException(status_code=400, detail="Game is not started")
+        if game.status["phase"] != "spell play":
+            raise HTTPException(status_code=400, detail="Its not time for playing spells!")
+        if current_player["current_position"] != "minister":
+            raise HTTPException(status_code=400, detail=f"This player is not the minister")
+        if game.board.de_proc == 0 or deck[game.board.de_proc - 1] != "divination":
+            raise HTTPException(status_code=400, detail="The divination spell is not available")
+        Player.reassign_minister(game)
+        return {"data": game.board.deck.split(",")[:3]}
 
 @router.post("/{game_id}/avadakedavra/{player_id}")
 async def kill_player(game_id: int, player_id: int, user=Depends(manager)):
@@ -248,7 +390,7 @@ async def kill_player(game_id: int, player_id: int, user=Depends(manager)):
         game = Game.get(id=game_id)
         current_player = Player.user_player(user, game_id)
         victim_player = Player.select(
-            lambda p: p.id == player_id and p.game == game_id).first()
+            lambda p: p.id == player_id and p.game.id == game_id).first()
         deck = game.board.spell_fields.split(",")
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
@@ -259,137 +401,12 @@ async def kill_player(game_id: int, player_id: int, user=Depends(manager)):
         current_player = Player.user_player(user, game_id)
         if not victim_player:
             raise HTTPException(status_code=400, detail="The victim player does not belong to this game")
-        if currentPlayer["current_position"] != "minister":
+        if current_player["current_position"] != "minister":
                 raise HTTPException(status_code=404, detail="This player is not the minister")
         if player_id == current_player["id"]:
             raise HTTPException(status_code=400, detail="You aren't allowed to kill this user")
-        victim_player['alive'] = False
+        victim_player.alive = False
         victim_user = User.select(
-            lambda u: u.id == victim_player["user"]).first()
+            lambda u: u.id == victim_player.user.id).first()
         Player.reassign_minister(game)
-        return {"avadakedavra": "succed!", "dead_player_id": player_id , "dead_player_alias": victim_user["useralias"]}
-
-@router.get("/{gameId}/proclamations")
-async def get_proclamations(gameId: int, user=Depends(manager)):
-    with db_session:
-        game = Game.get(id=gameId)
-        data = {}
-        
-        playerQuery = Player.select(lambda p: user["id"]==p.user.id and p.game.id == gameId)
-        currentPlayerArray = [p.to_dict() for p in playerQuery]
-        if (currentPlayerArray == []):
-            raise HTTPException(status_code=400, detail="The player does not belong to this game")
-        currentPlayer = currentPlayerArray[0]
-
-        if game is None:
-            raise HTTPException(status_code=404, detail="Game not found")
-        if game.status["phase"] == "minister play":
-            if currentPlayer["current_position"] != "minister":
-                raise HTTPException(status_code=404, detail="This player is not the minister")
-            cards = game.board.deck.split(',')[:3]
-            data = {"data": cards}
-        elif game.status["phase"] == "headmaster play":
-            if currentPlayer["current_position"] != "headmaster":
-                raise HTTPException(status_code=404, detail="This player is not the headmaster")
-            cards = game.board.deck.split(',')[:2]
-            data = {"data": cards}
-        else:
-            raise HTTPException(status_code=400, detail="It is not a phase for geting a proclamation")
-        return data
-
-@router.post("/{gameId}/proclamations")
-async def play(proc: ProcM, gameId: int, user=Depends(manager)):
-    with db_session:
-        game = Game.get(id=gameId)
-        if game is None:
-            raise HTTPException(status_code=404, detail="Game not found")
-
-        playerQuery = Player.select(lambda p: user["id"]==p.user.id and p.game.id == gameId)
-        currentPlayerArray = [p.to_dict() for p in playerQuery]
-        if (currentPlayerArray == []):
-            raise HTTPException(status_code=400, detail="The player does not belong to this game")
-        currentPlayer = currentPlayerArray[0]
-
-        cards = []
-        msg = ''
-        if game.status["phase"] == "minister play":
-            if currentPlayer["current_position"]!= "minister":
-                raise HTTPException(status_code=404, detail="This player is not the minister")
-            cards = game.board.deck.split(',')[:3]
-            if proc.card in cards:
-                cards = game.board.deck.split(',')
-                cards.remove(proc.card)
-                game.board.deck = ','.join(cards)
-            else:
-                raise HTTPException(status_code=400, detail="The input card was not one of the options") 
-            msg = f'{proc.card} card discarded successfully'
-            ########### PASS THE TURN ###########
-            game.status["phase"] = "headmaster play"
-            #####################################
-
-        elif game.status["phase"] == "headmaster play":
-            if currentPlayer["current_position"] != "headmaster":
-                raise HTTPException(status_code=404, detail="This player is not the headmaster")
-            cards = game.board.deck.split(',')[:2]
-            if proc.card in cards:
-                cards = game.board.deck.split(',')[2:]
-                game.board.deck = ','.join(cards)
-                if proc.card == 'phoenix':
-                    game.board.po_proc += 1
-                else:
-                    game.board.de_proc += 1
-                #IMPORTANT! HERE GOES THE LOGIC FOR SPELL ACTIVATION
-                ########### PASS THE TURN ###########
-                cant_proc = (game.board.po_proc + game.board.de_proc)-1
-                spellsArray = game.board.spell_fields.split(",")
-                if not spellsArray[cant_proc]:
-                    reasignMinister(Player, game)
-                else:
-                    game.status["phase"] = "spell play"
-                #####################################
-                msg = f'{proc.card} card played successfully'
-            else:
-                raise HTTPException(status_code=400, detail="The input card was not one of the options") 
-
-        else:
-            raise HTTPException(status_code=400, detail="It is not a phase for playing a proclamation")
-
-        return {"message": msg}
-        
-@router.delete("/{gameId}/delete")
-async def end_game(gameId: int, user=Depends(manager)):
-    status = {}
-    with db_session:
-        currentGame=Game.get(id=gameId)
-        if currentGame is None:
-            raise HTTPException(status_code=404, detail="The game does not exist")
-        if currentGame.created_by != user["id"]:
-            raise HTTPException(status_code=403, detail="The game does not belong to the current user")
-        gName = currentGame.name
-        players = currentGame.players
-        for p in players:
-            p.delete()
-        currentGame.board.delete()
-        currentGame.delete()
-    return {"message": f"The game {gameId} ({gName}) was deleted"}
-
-@router.get("/{gameId}/me")
-async def get_current_player(gameId: int, user=Depends(manager)):
-    with db_session:
-        game = Game.get(id=gameId)
-        if game is None:
-            raise HTTPException(status_code=404, detail="The game does not exist")
-
-        playerQuery = Player.select(lambda p: user["id"]==p.user.id and p.game.id == gameId)
-        currentPlayerArray = [p.to_dict() for p in playerQuery]
-        if (currentPlayerArray == []):
-            raise HTTPException(status_code=400, detail="The player does not belong to this game")
-        currentPlayer = currentPlayerArray[0]
-
-        return currentPlayer
-
-
-
-
-
-
+        return {"avadakedavra": "succed!", "dead_player_id": player_id , "dead_player_alias": victim_user.useralias}

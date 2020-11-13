@@ -1,6 +1,4 @@
 from fastapi import FastAPI
-from fastapi import Depends
-from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_login.exceptions import InvalidCredentialsException
 from fastapi.middleware.cors import CORSMiddleware
 from src.views import games, users
@@ -38,7 +36,7 @@ async def login(data: UserM):
     user = load_user(user)  # authentication file function
 
     if not user:
-        raise InvalidCredentialsException  # Default credential exeption
+        raise InvalidCredentialsException  # Default credential exception
     elif password != user['password']:
         raise InvalidCredentialsException
 
