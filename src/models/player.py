@@ -55,7 +55,7 @@ class Player(db.Entity):
     @staticmethod
     def reassign_minister(game):
         player_set = game.players
-        players_array = [p.id for p in player_set]
+        players_array = [p.id for p in player_set if p.alive]
         minister_id = game.status["minister"]
 
         if game.board.de_proc == 6:
