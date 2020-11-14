@@ -118,7 +118,7 @@ async def left_game(game_id: int, user=Depends(manager)):
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
         if game.started:
-            raise HTTPException(status_code=400, detail="The is already started")
+            raise HTTPException(status_code=400, detail="The Game is already started")
 
         current_player = Player.user_player(user, game_id)
         player_obj = Player.get(id=current_player["id"])
