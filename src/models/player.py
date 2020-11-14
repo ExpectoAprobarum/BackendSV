@@ -81,6 +81,8 @@ class Player(db.Entity):
 
                     fire_headmaster(game)
                     break
+        if 'votes' in game.status.keys():
+            del game.status["votes"]
 
     @staticmethod
     def user_player(user, game_id):
