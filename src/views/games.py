@@ -330,8 +330,6 @@ async def play(proc: ProcM, game_id: int, user=Depends(manager)):
                 spell_fields = game.board.spell_fields.split(",")
                 spells = ["divination", "avadakedavra"]
                 if game.board.de_proc != 0 and spell_fields[game.board.de_proc - 1] in spells:
-                    spell_fields[game.board.de_proc - 1] = ""
-                    game.board.spell_fields = ','.join(spell_fields)
                     game.status["phase"] = "spell play"
                 else:
                     Player.reassign_minister(game)

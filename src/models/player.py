@@ -59,6 +59,11 @@ class Player(db.Entity):
         players_array.sort()
         minister_id = game.status["minister"]
 
+        spell_fields = game.board.spell_fields.split(",")
+        if game.status["phase"] == "spell play":
+            spell_fields[game.board.de_proc - 1] = ""
+            game.board.spell_fields = ','.join(spell_fields)
+
         if game.board.de_proc == 6:
             game.status = {"info": "game ended", "winner": "Death Eaters"}
         elif game.board.po_proc == 5:
