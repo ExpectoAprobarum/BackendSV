@@ -389,3 +389,32 @@ async def play_divination(game_id: int, user=Depends(manager)):
             raise HTTPException(status_code=400, detail="The divination spell is not available")
         Player.reassign_minister(game)
         return {"data": game.board.deck.split(",")[:3]}
+
+@router.post("/{game_id}/avadakedavra")
+async def kill_player(player_id: PlayerM, game_id: int, user=Depends(manager)):
+    with db_session:
+        game = Game.get(id=game_id)
+        current_player = Player.user_player(user, game_id)
+        victim_player = Player.select(
+            lambda p: p.id == player_id.id and p.game.id == game_id).first()
+        deck = game.board.spell_fields.split(",")
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        if game.status["phase"] != "spell play":
+            raise HTTPException(status_code=400, detail="Its not time for playing spells!")
+        if not game.board.de_proc or deck[game.board.de_proc - 1] != 'avadakedavra':
+            raise HTTPException(status_code=400, detail="The avadakedavra spell is not available")
+        if not victim_player:
+            raise HTTPException(status_code=400, detail="The victim player does not belong to this game")
+        if current_player["current_position"] != "minister":
+                raise HTTPException(status_code=404, detail="This player is not the minister")
+        if player_id.id == current_player["id"]:
+            raise HTTPException(status_code=400, detail="You aren't allowed to kill this user")
+        victim_player.alive = False
+        if victim_player.is_voldemort:
+            game.status = {"info": "game ended", "winner": "Phoenix Order"}
+        else:
+            Player.reassign_minister(game)
+        victim_user = User.select(
+            lambda u: u.id == victim_player.user.id).first()
+        return {"avadakedavra": "succed!", "dead_player_id": player_id.id , "dead_player_alias": victim_user.useralias}
