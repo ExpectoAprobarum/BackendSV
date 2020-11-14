@@ -18,5 +18,4 @@ def load_user(user_str: str):  # could also be an asynchronous function
                 user = User.get(email=user_str)
             if user:
                 return user.to_dict()
-
     return user

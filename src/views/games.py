@@ -135,13 +135,14 @@ async def list_players(game_id: int, user=Depends(manager)):
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
         players = game.players
-        status = {'data': [p.to_dict() for p in players]}
-        for p in status['data']:
+        parsed_players = [p.to_dict() for p in players]
+        parsed_players.sort(key=lambda x: x.get('id'))
+        for p in parsed_players:
             user = User.get(id=p['user']).to_dict()
             user.pop("password")
             user.pop("email")
             p.update(user=user)
-    return status
+    return {'data': parsed_players}
 
 
 @router.get("/{game_id}/status")
@@ -198,14 +199,20 @@ async def choose_headmaster(headmaster: PlayerM, game_id: int, user=Depends(mana
             raise HTTPException(status_code=400, detail="The selected player does not exist")
         if new_hm.id == status["minister"]:
             raise HTTPException(status_code=400, detail="The minister can not be the headmaster")
+        if not new_hm.choosable:
+            raise HTTPException(status_code=400, detail="The player has been headmaster in the previous round")
         if new_hm.game.id != game_id:
             raise HTTPException(status_code=400, detail="The player does not belong to this game")
+        if not new_hm.choosable:
+            raise HTTPException(status_code=400, detail="The player cannot be headmaster in this round")
+        Player.reset_choosable()
         status["headmaster"] = headmaster.id
         # PASS THE TURN ####################
         status["phase"] = "vote"
         #####################################
         game.status = status
         new_hm.current_position = "headmaster"
+        new_hm.choosable = False
         return {"message": f'The player number {new_hm.id}: {new_hm.user.username} was proposed as headmaster'}
 
 
@@ -247,7 +254,7 @@ async def vote(in_vote: VoteM, game_id: int, user=Depends(manager)):
             if lumos_votes > nox_votes:
                 # PASS THE TURN ######################
                 game.status["phase"] = "minister play"
-                general_msg = "election succed"
+                general_msg = "election succeed"
                 ######################################
             else:
                 # PASS THE TURN #####################
@@ -256,7 +263,6 @@ async def vote(in_vote: VoteM, game_id: int, user=Depends(manager)):
                 Player.reassign_minister(game)
                 # WRITE ACTIONS TO DO IF CAOS IS EQUAL TO 5
                 #####################################
-            del game.status["votes"]
         return {"vote": player_msg, "election": general_msg}
 
 
@@ -321,7 +327,12 @@ async def play(proc: ProcM, game_id: int, user=Depends(manager)):
                     game.board.de_proc += 1
                 # IMPORTANT! HERE GOES THE LOGIC FOR SPELL ACTIVATION
                 # PASS THE TURN ###########
-                Player.reassign_minister(game)
+                spell_fields = game.board.spell_fields.split(",")
+                spells = ["divination", "avadakedavra"]
+                if game.board.de_proc != 0 and spell_fields[game.board.de_proc - 1] in spells:
+                    game.status["phase"] = "spell play"
+                else:
+                    Player.reassign_minister(game)
                 #####################################
                 msg = f'{proc.card} card played successfully'
             else:
@@ -358,3 +369,52 @@ async def get_current_player(game_id: int, user=Depends(manager)):
             raise HTTPException(status_code=404, detail="The game does not exist")
 
         return Player.user_player(user, game_id)
+
+
+@router.get("/{game_id}/divination")
+async def play_divination(game_id: int, user=Depends(manager)):
+    with db_session:
+        game = Game.get(id=game_id)
+        current_player = Player.user_player(user, game_id)
+        deck = game.board.spell_fields.split(",")
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        if not game.started:
+            raise HTTPException(status_code=400, detail="Game is not started")
+        if game.status["phase"] != "spell play":
+            raise HTTPException(status_code=400, detail="Its not time for playing spells!")
+        if current_player["current_position"] != "minister":
+            raise HTTPException(status_code=400, detail=f"This player is not the minister")
+        if game.board.de_proc == 0 or deck[game.board.de_proc - 1] != "divination":
+            raise HTTPException(status_code=400, detail="The divination spell is not available")
+        Player.reassign_minister(game)
+        return {"data": game.board.deck.split(",")[:3]}
+
+@router.post("/{game_id}/avadakedavra")
+async def kill_player(player_id: PlayerM, game_id: int, user=Depends(manager)):
+    with db_session:
+        game = Game.get(id=game_id)
+        current_player = Player.user_player(user, game_id)
+        victim_player = Player.select(
+            lambda p: p.id == player_id.id and p.game.id == game_id).first()
+        deck = game.board.spell_fields.split(",")
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        if game.status["phase"] != "spell play":
+            raise HTTPException(status_code=400, detail="Its not time for playing spells!")
+        if not game.board.de_proc or deck[game.board.de_proc - 1] != 'avadakedavra':
+            raise HTTPException(status_code=400, detail="The avadakedavra spell is not available")
+        if not victim_player:
+            raise HTTPException(status_code=400, detail="The victim player does not belong to this game")
+        if current_player["current_position"] != "minister":
+                raise HTTPException(status_code=404, detail="This player is not the minister")
+        if player_id.id == current_player["id"]:
+            raise HTTPException(status_code=400, detail="You aren't allowed to kill this user")
+        victim_player.alive = False
+        if victim_player.is_voldemort:
+            game.status = {"info": "game ended", "winner": "Phoenix Order"}
+        else:
+            Player.reassign_minister(game)
+        victim_user = User.select(
+            lambda u: u.id == victim_player.user.id).first()
+        return {"avadakedavra": "succed!", "dead_player_id": player_id.id , "dead_player_alias": victim_user.useralias}
