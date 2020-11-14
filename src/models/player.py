@@ -56,7 +56,13 @@ class Player(db.Entity):
     def reassign_minister(game):
         player_set = game.players
         players_array = [p.id for p in player_set if p.alive]
+        players_array.sort()
         minister_id = game.status["minister"]
+
+        spell_fields = game.board.spell_fields.split(",")
+        if game.status["phase"] == "spell play":
+            spell_fields[game.board.de_proc - 1] = ""
+            game.board.spell_fields = ','.join(spell_fields)
 
         if game.board.de_proc == 6:
             game.status = {"info": "game ended", "winner": "Death Eaters"}
@@ -80,6 +86,8 @@ class Player(db.Entity):
 
                     fire_headmaster(game)
                     break
+        if 'votes' in game.status.keys():
+            del game.status["votes"]
 
     @staticmethod
     def user_player(user, game_id):

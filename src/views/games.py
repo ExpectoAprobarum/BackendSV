@@ -135,13 +135,14 @@ async def list_players(game_id: int, user=Depends(manager)):
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
         players = game.players
-        status = {'data': [p.to_dict() for p in players]}
-        for p in status['data']:
+        parsed_players = [p.to_dict() for p in players]
+        parsed_players.sort(key=lambda x: x.get('id'))
+        for p in parsed_players:
             user = User.get(id=p['user']).to_dict()
             user.pop("password")
             user.pop("email")
             p.update(user=user)
-    return status
+    return {'data': parsed_players}
 
 
 @router.get("/{game_id}/status")
@@ -326,7 +327,12 @@ async def play(proc: ProcM, game_id: int, user=Depends(manager)):
                     game.board.de_proc += 1
                 # IMPORTANT! HERE GOES THE LOGIC FOR SPELL ACTIVATION
                 # PASS THE TURN ###########
-                game.status["phase"] = "spell play"
+                spell_fields = game.board.spell_fields.split(",")
+                spells = ["divination", "avadakedavra"]
+                if game.board.de_proc != 0 and spell_fields[game.board.de_proc - 1] in spells:
+                    game.status["phase"] = "spell play"
+                else:
+                    Player.reassign_minister(game)
                 #####################################
                 msg = f'{proc.card} card played successfully'
             else:
