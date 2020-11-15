@@ -2,8 +2,8 @@ from pony.orm import db_session, commit
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from src.models import User
-from src.services import manager
 from typing import Optional
+from src.services import manager, simple_send, generate_confirmation_token, confirm_token
 
 router = APIRouter()
 
@@ -13,6 +13,11 @@ class UserM(BaseModel):
     useralias: str
     email: str
     password: str
+    frontURL: str
+
+
+class ConfM(BaseModel):
+    code: str
 
 
 class UserMod(BaseModel):
@@ -33,12 +38,29 @@ async def new_user(input_game: UserM):
                     useralias=input_game.useralias,
                     email=input_game.email,
                     password=input_game.password)
+                commit()
+
+                await simple_send([input_game.email],
+                                  generate_confirmation_token(input_game.email),
+                                  input_game.frontURL)
             else:
                 raise HTTPException(status_code=400, detail="Email already registered")
         else:
             raise HTTPException(status_code=400, detail="Username already registered")
-        commit()
         return {"id": curr_user.id, "message": "User created successfully"}
+
+
+@router.post("/confirm")
+async def confirm(confirmation: ConfM):
+    with db_session:
+        decr_email = confirm_token(confirmation.code)
+        if not decr_email:
+            raise HTTPException(status_code=400, detail="invalid code")
+        user = User.get(email=decr_email)
+        if not user:
+            raise HTTPException(status_code=400, detail="invalid code")
+        user.verified = True
+        return {"info": f'your account {user.username} has been activated!'}
 
 
 @router.put("/")
