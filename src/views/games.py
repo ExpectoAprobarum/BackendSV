@@ -205,6 +205,8 @@ async def choose_headmaster(headmaster: PlayerM, game_id: int, user=Depends(mana
             raise HTTPException(status_code=400, detail="The player does not belong to this game")
         if not new_hm.choosable:
             raise HTTPException(status_code=400, detail="The player cannot be headmaster in this round")
+        if not new_hm.alive:
+            raise HTTPException(status_code=400, detail="The player cannot be headmaster because is dead")
         Player.reset_choosable()
         status["headmaster"] = headmaster.id
         # PASS THE TURN ####################
@@ -224,7 +226,7 @@ async def vote(in_vote: VoteM, game_id: int, user=Depends(manager)):
             raise HTTPException(status_code=404, detail="Game not found")
         if game.status["phase"] != "vote":
             raise HTTPException(status_code=400, detail="It is not the vote phase")
-
+        
         current_player = Player.user_player(user, game_id)
         vote_arr = [{"player": current_player["id"],
                      "user": user["id"],
