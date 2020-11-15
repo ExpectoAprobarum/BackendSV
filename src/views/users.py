@@ -58,13 +58,13 @@ async def confirm(confirmation: ConfM):
             raise HTTPException(status_code=400, detail="invalid code")
         user = User.get(email=decr_email)
         if not user:
-            raise HTTPException(status_code=400, detail="invalid code")
+            raise HTTPException(status_code=400, detail="user not found")
         user.verified = True
         return {"info": f'your account {user.username} has been activated!'}
 
 
 @router.put("/")
-async def new_user(input_game: UserMod, user=Depends(manager)):
+async def mod_user(input_game: UserMod, user=Depends(manager)):
     with db_session:
         user = User.get(id=user["id"])
         message = 'fields modified:'
