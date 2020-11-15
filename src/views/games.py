@@ -356,7 +356,8 @@ async def end_game(game_id: int, user=Depends(manager)):
         players = current_game.players
         for p in players:
             p.delete()
-        current_game.board.delete()
+        if current_game.board:
+            current_game.board.delete()
         current_game.delete()
         return {"message": f"The game {game_id} ({g_name}) was deleted"}
 
