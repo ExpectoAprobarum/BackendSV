@@ -75,7 +75,7 @@ async def start_game(game_id: int, user=Depends(manager)):
 
         # spell board and random deck
         spell_fields = ','.join(Board.define_board(current_game.player_amount))
-        random_deck = ','.join(Board.new_deck(15))
+        random_deck = ','.join(Board.new_deck(50))
 
         new_board = Board(de_proc=0, po_proc=0, spell_fields=spell_fields, caos=0, game=current_game, deck=random_deck)
         current_game.started = True
@@ -358,7 +358,8 @@ async def end_game(game_id: int, user=Depends(manager)):
         players = current_game.players
         for p in players:
             p.delete()
-        current_game.board.delete()
+        if current_game.board:
+            current_game.board.delete()
         current_game.delete()
         return {"message": f"The game {game_id} ({g_name}) was deleted"}
 
