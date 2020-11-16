@@ -37,11 +37,12 @@ async def login(data: UserM):
 
     with db_session:
         db_user = User.get(username=user)
+        if not db_user:
+            db_user = User.get(email=user)
+
         user = load_user(user)  # authentication file function
-        if not user:
+        if not user or password != user['password'] or not db_user:
             raise InvalidCredentialsException  # Default credential exception
-        elif password != user['password']:
-            raise InvalidCredentialsException
         elif not db_user.verified:
             raise HTTPException(status_code=400, detail="The user is not verified, please check your mail inbox")
         access_token = manager.create_access_token(
