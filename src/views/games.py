@@ -203,8 +203,6 @@ async def choose_headmaster(headmaster: PlayerM, game_id: int, user=Depends(mana
             raise HTTPException(status_code=400, detail="The player has been headmaster in the previous round")
         if new_hm.game.id != game_id:
             raise HTTPException(status_code=400, detail="The player does not belong to this game")
-        if not new_hm.choosable:
-            raise HTTPException(status_code=400, detail="The player cannot be headmaster in this round")
         if not new_hm.alive:
             raise HTTPException(status_code=400, detail="The player cannot be headmaster because is dead")
         Player.reset_choosable()

@@ -2,8 +2,8 @@ from fastapi.testclient import TestClient
 from .main import app
 import pytest
 from src.models import Game, Board, User, Player
-from pony.orm import db_session
-
+from pony.orm import db_session, commit
+import datetime
 client = TestClient(app)
 
 pytest.users = {
@@ -116,6 +116,7 @@ def test_exit_game():
     response = client.post("/games/1/join", headers=headers, json={})
     assert response.status_code == 200
     assert response.json() == {"message": 'joined successfully'}
+    pytest.users[6] = pytest.users[2]
 
 def test_start_game():
     headers = {
@@ -129,6 +130,12 @@ def test_start_game():
         }
     headers['Authorization'] = 'Bearer ' + pytest.users[1]["token"]
     response = client.get("/games/1/board", headers=headers)
+    response.status_code == 400
+    response.json() == {'detail': "Game is not started"}
+    response = client.post("/games/1/choosehm", headers=headers)
+    response.status_code == 400
+    response.json() == {'detail': "Game is not started"}
+    response = client.get("/games/1/deck", headers=headers)
     response.status_code == 400
     response.json() == {'detail': "Game is not started"}
     response = client.post("/games/1/start", headers=headers)
@@ -333,6 +340,129 @@ def test_board_game():
     response.status_code == 404
     response.json() == {'detail': "The game does not exist"}
 
+def test_deck_game():
+    headers = {
+    'Authorization': 'Bearer ' + pytest.users[1]["token"],
+    'Content-Type': 'text/plain'
+    }
+    with db_session:
+        deck = Game.get(id=1).board.deck
+    response = client.get("/games/1/deck", headers=headers)
+    response.status_code == 200
+    response.json() == deck
+    response = client.get("/games/100/deck", headers=headers)
+    response.status_code == 404
+    response.json() == {'detail': "The game does not exist"}
+
+def test_choosehm_game():
+    with db_session:
+        game = Game.get(id=1)
+        minister = game.status["minister"]
+        game.status["phase"] = "x"
+    headers = {
+    'Authorization': 'Bearer ' + pytest.users[minister]["token"],
+    'Content-Type': 'text/plain'
+    }
+    response = client.post("/games/100/choosehm", headers=headers)
+    response.status_code == 404
+    response.json() == {'detail': "Game not found"}
+    response = client.post("/games/1/choosehm", headers=headers)
+    response.status_code == 400
+    response.json() == {
+        'detail': "The headmaster only can be elected in the propose phase"}
+    with db_session:
+        game = Game.get(id=1)
+        game.status["phase"] = "propose"
+    acc = minister
+    acc = (acc % 5) + 1
+    if acc == 2:
+        acc = 3
+    headers['Authorization'] = 'Bearer ' + pytest.users[acc]["token"]
+    response = client.post("/games/1/choosehm", headers=headers)
+    response.status_code == 400
+    response.json() == {
+        'detail': "Only the minister can propose a headmaster"}
+    headers['Authorization'] = 'Bearer ' + pytest.users[minister]["token"]
+    response = client.post(
+    "/games/1/choosehm", headers=headers,
+    json={"id": "300"}
+    )
+    response.status_code == 400
+    response.json() == {
+        'detail': "The selected player does not exist"}
+    response = client.post(
+    "/games/1/choosehm", headers=headers,
+    json={"id": str(minister)}
+    )
+    response.status_code == 400
+    response.json() == {
+        'detail': "The minister can not be the headmaster"}
+    with db_session:
+        other_guy = Player.get(id=acc)
+        other_guy.choosable = False
+    response = client.post(
+    "/games/1/choosehm", headers=headers,
+    json={"id": str(acc)}
+    )
+    response.status_code == 400
+    response.json() == {
+        'detail': "The player has been headmaster in the previous round"}
+    with db_session:
+        user = User.get(id=int(minister))
+        new_game = Game(name="x", created_by=1, started=False,
+                    creation_date=datetime.datetime.now(),
+                    player_amount=5, status={})
+        new_player = Player(choosable=True, current_position='', role='', is_voldemort=False, alive=True,
+                        user=user)
+        new_game.players.add(new_player)
+        other_guy = Player.get(id=acc)
+        other_guy.choosable = True
+        other_guy.alive = False
+        commit()
+    response = client.post(
+    "/games/1/choosehm", headers=headers,
+    json={"id": str(new_player.id)}
+    )
+    response.status_code == 400
+    response.json() == {
+        'detail': "The player does not belong to this game"}
+    response = client.post(
+    "/games/1/choosehm", headers=headers,
+    json={"id": str(other_guy.id)}
+    )
+    response.status_code == 400
+    response.json() == {
+        'detail': "The player cannot be headmaster because is dead"}
+    with db_session:
+        other_guy = Player.get(id=acc)
+        other_guy.alive = True
+        username = other_guy.user.username
+    response = client.post(
+    "/games/1/choosehm", headers=headers,
+    json={"id": str(other_guy.id)}
+    )
+    response.status_code == 200
+    response.json() == {
+    "message": f"The player number {other_guy.id}: \
+            {username} was proposed as headmaster"
+    }
 
 
-
+def test_vote_game():
+    headers = {
+    'Authorization': 'Bearer ' + pytest.users[1]["token"],
+    'Content-Type': 'text/plain'
+    }
+    response = client.post("/games/100/vote", headers=headers)
+    response.status_code == 404
+    response.json() == {'detail': "Game not found"}
+    with db_session:
+        game = Game.get(id=1)
+        game.status["phase"] = "x"
+    response = client.post("/games/1/vote", headers=headers)
+    response.status_code == 400
+    response.json() == {'detail': "It is not the vote phase"}
+    with db_session:
+        game = Game.get(id=1)
+        game.status["phase"] = "vote"
+    
