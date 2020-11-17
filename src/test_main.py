@@ -7,36 +7,37 @@ import datetime
 client = TestClient(app)
 
 pytest.users = {
-    1: {"username": "andres", "useralias": "andres", "email": "a@a.com", "password": "12345"},
-    2: {"username": "andres2", "useralias": "andres2", "email": "a2@a.com", "password": "12345"},
-    3: {"username": "andres3", "useralias": "andres3", "email": "a3@a.com", "password": "12345"},
-    4: {"username": "andres4", "useralias": "andres4", "email": "a4@a.com", "password": "12345"},
-    5: {"username": "andres5", "useralias": "andres5", "email": "a5@a.com", "password": "12345"}
+    1: {"username": "andres", "useralias": "andres", "email": "a@gmail.com", "password": "12345"},
+    2: {"username": "andres2", "useralias": "andres2", "email": "a2@gmail.com", "password": "12345"},
+    3: {"username": "andres3", "useralias": "andres3", "email": "a3@gmail.com", "password": "12345"},
+    4: {"username": "andres4", "useralias": "andres4", "email": "a4@gmail.com", "password": "12345"},
+    5: {"username": "andres5", "useralias": "andres5", "email": "a5@gmail.com", "password": "12345"}
     }
 pytest.info = {}
 
-
 def test_create_user():
-    with db_session:
-        for i,u in enumerate(pytest.users.values()):
+    for i,u in enumerate(pytest.users.values()):
+        with db_session:
             response = client.post(
                 "/users/", headers={},
-                json={"username": u['username'], "useralias": u["useralias"], "email": u['email'], "password": "12345"}
+                json={"username": u['username'],
+                "useralias": u["useralias"], "email": u['email'],
+                "password": "12345", "frontURL":"ded"}
             )
-            user = User.get(username=u['username'])
-            assert response.status_code == 200
-            rjson = response.json()
-            assert rjson == {"id": int(user.id), "message": "User created successfully"}
+    with db_session:
+        for i,u in enumerate(pytest.users.values()):
+            user = User.get(email=u["email"])
+            user.verified = True
             u["user_id"] = int(user.id)
     response = client.post(
-        "/users/", headers={},
-        json=pytest.users[1]
+    "/users/", headers={},
+    json={"username": "andres", "useralias": "andres", "email": "a@a.com", "password": "12345","frontURL":"ded"}
     )
     assert response.status_code == 400
     assert response.json() == {"detail": "Username already registered"}
     response = client.post(
         "/users/", headers={},
-        json={"username": "andres345", "useralias": "andres234", "email": "a@a.com", "password": "12345"}
+        json={"username": "andres345", "useralias": "andres234", "email": "a@gmail.com", "password": "12345","frontURL":"ded"}
     )
     assert response.status_code == 400
     assert response.json() == {"detail": "Email already registered"}
@@ -223,71 +224,76 @@ def test_players_game():
                         "id": player1.id,
                         "choosable": True,
                         "current_position": player1.current_position,
+                        "game": pytest.info['game'],
                         "role": player1.role,
                         "is_voldemort": player1.is_voldemort,
                         "alive": True,
                         "user": {
                             "id": pytest.users[1]["user_id"],
+                            "useralias": "andres",
                             "username": "andres",
-                            "useralias": "andres"
+                            'verified': True
                         },
-                        "game": pytest.info['game']
                     },
                     {
                         "id": player3.id,
                         "choosable": True,
                         "current_position": player3.current_position,
+                        "game": pytest.info['game'],
                         "role": player3.role,
                         "is_voldemort": player3.is_voldemort,
                         "alive": True,
                         "user": {
                             "id": pytest.users[3]["user_id"],
+                            "useralias": "andres3",
                             "username": "andres3",
-                            "useralias": "andres3"
+                            'verified': True
                         },
-                        "game": pytest.info['game']
                     },
                     {
                         "id": player4.id,
                         "choosable": True,
                         "current_position": player4.current_position,
+                        "game": pytest.info['game'],
                         "role": player4.role,
                         "is_voldemort": player4.is_voldemort,
                         "alive": True,
                         "user": {
                             "id": pytest.users[4]["user_id"],
+                            "useralias": "andres4",
                             "username": "andres4",
-                            "useralias": "andres4"
+                            "verified": True
                         },
-                        "game": pytest.info['game']
                     },
                     {
                         "id": player5.id,
                         "choosable": True,
                         "current_position": player5.current_position,
+                        "game": pytest.info['game'],
                         "role": player5.role,
                         "is_voldemort": player5.is_voldemort,
                         "alive": True,
                         "user": {
                             "id": pytest.users[5]["user_id"],
+                            "useralias": "andres5",
                             "username": "andres5",
-                            "useralias": "andres5"
+                            "verified": True
                         },
-                        "game": pytest.info['game']
                     },
                     {
                         "id": player2.id,
                         "choosable": True,
                         "current_position": player2.current_position,
+                        "game": pytest.info['game'],
                         "role": player2.role,
                         "is_voldemort": player2.is_voldemort,
                         "alive": True,
                         "user": {
                             "id": pytest.users[2]["user_id"],
+                            "useralias": "andres2",
                             "username": "andres2",
-                            "useralias": "andres2"
-                        },
-                        "game": pytest.info['game']
+                            "verified": True
+                        }
                     }
                 ]
             }

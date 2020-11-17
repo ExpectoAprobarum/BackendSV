@@ -6,3 +6,5 @@ passlib[bcrypt]
 fastapi_login
 fastapi-mail
 itsdangerous
+pytest
+pytest-cov
