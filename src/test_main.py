@@ -13,17 +13,21 @@ pytest.users = {
     4: {"username": "andres4", "useralias": "andres4", "email": "a4@a.com", "password": "12345"},
     5: {"username": "andres5", "useralias": "andres5", "email": "a5@a.com", "password": "12345"}
     }
+pytest.info = {}
 
 
 def test_create_user():
-    for i,u in enumerate(pytest.users.values()):
-        response = client.post(
-            "/users/", headers={},
-            json={"username": u['username'], "useralias": u["useralias"], "email": u['email'], "password": "12345"}
-        )
-        assert response.status_code == 200
-        rjson = response.json()
-        assert rjson == {"id": i+1, "message": "User created successfully"}
+    with db_session:
+        for i,u in enumerate(pytest.users.values()):
+            response = client.post(
+                "/users/", headers={},
+                json={"username": u['username'], "useralias": u["useralias"], "email": u['email'], "password": "12345"}
+            )
+            user = User.get(username=u['username'])
+            assert response.status_code == 200
+            rjson = response.json()
+            assert rjson == {"id": int(user.id), "message": "User created successfully"}
+            u["user_id"] = int(user.id)
     response = client.post(
         "/users/", headers={},
         json=pytest.users[1]
@@ -55,9 +59,11 @@ def test_create_game():
     }
     response = client.post("/games/", headers=headers,
         json={"name":"Partida 1", "player_amount": 5})
-    assert response.status_code == 200
-    assert response.json() == {'id': 1, 'message': 'Game created successfully'}
-
+    with db_session:
+        game = Game.get(created_by=pytest.users[1]["user_id"])
+        assert response.status_code == 200
+        assert response.json() == {'id': game.id, 'message': 'Game created successfully'}
+        pytest.info["game"] = game.id
 
 def test_join_game():
     for i,u in enumerate(list(pytest.users.values())[1:]):
@@ -65,13 +71,13 @@ def test_join_game():
         'Authorization': 'Bearer ' + u["token"],
         'Content-Type': 'text/plain'
         }
-        response = client.post("/games/1/join", headers=headers, json={})
+        response = client.post(f"/games/{pytest.info['game']}/join", headers=headers, json={})
         assert response.status_code == 200
         assert response.json() == {"message": 'joined successfully'}
     response = client.post("/games/100/join", headers=headers, json={})
     assert response.status_code == 404
     assert response.json() == {"detail": 'Game not found'}
-    response = client.post("/games/1/join", headers=headers, json={})
+    response = client.post(f"/games/{pytest.info['game']}/join", headers=headers, json={})
     assert response.status_code == 403
     assert response.json() == {"detail": 'The game is full'}
 
@@ -86,21 +92,15 @@ def test_get_games():
         json={}
     )
     with db_session:
-        creation_data = str(Game.get(id=1).creation_date).replace(" ","T")
-    print(creation_data)
+        creation_date = str(Game.get(id=pytest.info['game']).creation_date).replace(" ","T")
+        games = Game.select()[:]
+        result = {'data': [g.to_dict() for g in games if not g.started]}
+    print(type(result["data"][0]["creation_date"]))
+    for g in result["data"]:
+        g["creation_date"] = str(g["creation_date"]).replace(" ","T")
     assert response.status_code == 200
     print(response.json())
-    assert response.json() == {
-    "data": [
-            {"id": 1,
-            "name": "Partida 1",
-            "creation_date": creation_data,
-            "created_by": 1,
-            "player_amount": 5,
-            "started": False,
-            "status": {},
-            "board": None
-        }]}
+    assert response.json() == result
 
 def test_exit_game():
     headers = {
@@ -110,10 +110,10 @@ def test_exit_game():
     response = client.post("/games/100/exit", headers=headers)
     assert response.status_code == 404
     assert response.json() == {"detail": 'Game not found'}
-    response = client.post("/games/1/exit", headers=headers)
+    response = client.post(f"/games/{pytest.info['game']}/exit", headers=headers)
     assert response.status_code == 200
     assert response.json() == {"message": 'game left successfully'}
-    response = client.post("/games/1/join", headers=headers, json={})
+    response = client.post(f"/games/{pytest.info['game']}/join", headers=headers, json={})
     assert response.status_code == 200
     assert response.json() == {"message": 'joined successfully'}
     pytest.users[6] = pytest.users[2]
@@ -123,36 +123,38 @@ def test_start_game():
     'Authorization': 'Bearer ' + pytest.users[2]["token"],
     'Content-Type': 'text/plain'
     }
-    response = client.post("/games/1/start", headers=headers)
+    response = client.post(f"/games/{pytest.info['game']}/start", headers=headers)
     assert response.status_code == 403
     assert response.json() == {
         'detail': "The game does not belong to the current user"
         }
     headers['Authorization'] = 'Bearer ' + pytest.users[1]["token"]
-    response = client.get("/games/1/board", headers=headers)
+    response = client.get(f"/games/{pytest.info['game']}/board", headers=headers)
     assert response.status_code == 400
     assert response.json() == {'detail': "Game is not started"}
-    response = client.post("/games/1/choosehm", headers=headers,
+    response = client.post(f"/games/{pytest.info['game']}/choosehm", headers=headers,
     json={"id":"2"})
     assert response.status_code == 400
     assert response.json() == {'detail': "Game is not started"}
-    response = client.get("/games/1/deck", headers=headers)
+    response = client.get(f"/games/{pytest.info['game']}/deck", headers=headers)
     assert response.status_code == 400
     assert response.json() == {'detail': "Game is not started"}
-    response = client.post("/games/1/start", headers=headers)
+    response = client.post(f"/games/{pytest.info['game']}/start", headers=headers)
     assert response.status_code == 200
+    with db_session:
+        board_id = Game.get(id=pytest.info['game']).board.id
     assert response.json() == {
-        'board_id': 1,
+        'board_id': board_id,
         'message': 'Game started successfully'
         }
     headers['Authorization'] = 'Bearer ' + pytest.users[2]["token"]
-    response = client.post("/games/1/exit", headers=headers)
+    response = client.post(f"/games/{pytest.info['game']}/exit", headers=headers)
     assert response.status_code == 400
     assert response.json() == {"detail": 'The Game is already started'}
     response = client.post("/games/100/start", headers=headers)
     assert response.status_code == 404
     assert response.json() == {'detail': "The game does not exist"}
-    response = client.post("/games/1/start", headers=headers)
+    response = client.post(f"/games/{pytest.info['game']}/start", headers=headers)
     assert response.status_code == 400
     assert response.json() == {'detail': "The game was already started"}
 
@@ -162,16 +164,19 @@ def test_get_game():
     'Authorization': 'Bearer ' + pytest.users[2]["token"],
     'Content-Type': 'text/plain'
     }
-    response = client.get("/games/1", headers=headers)
+    response = client.get(f"/games/{pytest.info['game']}", headers=headers)
     with db_session:
-        creation_data = str(Game.get(id=1).creation_date).replace(" ","T")
-        minister = int(Game.get(id=1).status["minister"])
+        game = Game.get(id=pytest.info['game'])
+        creation_date = str(game.creation_date).replace(" ","T")
+        minister = int(game.status["minister"])
+        created_by = int(game.created_by)
+        board = game.board.id
     assert response.status_code == 200
     assert response.json() == {
-            "id": 1,
+            "id": pytest.info['game'],
             "name": "Partida 1",
-            "creation_date": creation_data,
-            "created_by": 1,
+            "creation_date": creation_date,
+            "created_by": created_by,
             "player_amount": 5,
             "started": True,
             "status": {
@@ -179,7 +184,7 @@ def test_get_game():
                 "phase": "propose",
                 "round": 1
             },
-            "board": 1}
+            "board": board}
     response = client.get("/games/100", headers=headers)
     assert response.status_code == 404
     assert response.json() == {'detail': 'Game not found'}
@@ -189,81 +194,100 @@ def test_players_game():
     'Authorization': 'Bearer ' + pytest.users[2]["token"],
     'Content-Type': 'text/plain'
     }
-    response = client.get("/games/1/players", headers=headers)
+    response = client.get(f"/games/{pytest.info['game']}/players", headers=headers)
     assert response.status_code == 200
     with db_session:
-
+        player1 = Player.select(
+            lambda p: p.user.username == pytest.users[1]["username"] and 
+            p.game.id == pytest.info['game']).first()
+        pytest.users[1]["player_id"] = player1.id 
+        player2 = Player.select(
+            lambda p: p.user.username == pytest.users[2]["username"] and 
+            p.game.id == pytest.info['game']).first()
+        pytest.users[2]["player_id"] = player2.id
+        player3 = Player.select(
+            lambda p: p.user.username == pytest.users[3]["username"] and 
+            p.game.id == pytest.info['game']).first()
+        pytest.users[3]["player_id"] = player3.id
+        player4 = Player.select(
+            lambda p: p.user.username == pytest.users[4]["username"] and 
+            p.game.id == pytest.info['game']).first()
+        pytest.users[4]["player_id"] = player4.id
+        player5 = Player.select(
+            lambda p: p.user.username == pytest.users[5]["username"] and 
+            p.game.id == pytest.info['game']).first()
+        pytest.users[5]["player_id"] = player5.id
         assert response.json() == {
                 "data": [
                     {
-                        "id": 1,
+                        "id": player1.id,
                         "choosable": True,
-                        "current_position": Player.get(id=1).current_position,
-                        "role": Player.get(id=1).role,
-                        "is_voldemort": Player.get(id=1).is_voldemort,
+                        "current_position": player1.current_position,
+                        "role": player1.role,
+                        "is_voldemort": player1.is_voldemort,
                         "alive": True,
                         "user": {
-                            "id": 1,
+                            "id": pytest.users[1]["user_id"],
                             "username": "andres",
                             "useralias": "andres"
                         },
-                        "game": 1
+                        "game": pytest.info['game']
                     },
                     {
-                        "id": 3,
+                        "id": player3.id,
                         "choosable": True,
-                        "current_position": Player.get(id=3).current_position,
-                        "role": Player.get(id=3).role,
-                        "is_voldemort": Player.get(id=3).is_voldemort,
+                        "current_position": player3.current_position,
+                        "role": player3.role,
+                        "is_voldemort": player3.is_voldemort,
                         "alive": True,
                         "user": {
-                            "id": 3,
+                            "id": pytest.users[3]["user_id"],
                             "username": "andres3",
                             "useralias": "andres3"
                         },
-                        "game": 1
+                        "game": pytest.info['game']
                     },
                     {
-                        "id": 4,
+                        "id": player4.id,
                         "choosable": True,
-                        "current_position": Player.get(id=4).current_position,
-                        "role": Player.get(id=4).role,
-                        "is_voldemort": Player.get(id=4).is_voldemort,
+                        "current_position": player4.current_position,
+                        "role": player4.role,
+                        "is_voldemort": player4.is_voldemort,
                         "alive": True,
                         "user": {
-                            "id": 4,
+                            "id": pytest.users[4]["user_id"],
                             "username": "andres4",
                             "useralias": "andres4"
                         },
-                        "game": 1
+                        "game": pytest.info['game']
                     },
                     {
-                        "id": 5,
+                        "id": player5.id,
                         "choosable": True,
-                        "current_position": Player.get(id=5).current_position,
-                        "role": Player.get(id=5).role,
-                        "is_voldemort": Player.get(id=5).is_voldemort,
+                        "current_position": player5.current_position,
+                        "role": player5.role,
+                        "is_voldemort": player5.is_voldemort,
                         "alive": True,
                         "user": {
-                            "id": 5,
+                            "id": pytest.users[5]["user_id"],
                             "username": "andres5",
                             "useralias": "andres5"
                         },
-                        "game": 1
+                        "game": pytest.info['game']
                     },
                     {
-                        "id": 6,
+                        "id": player2.id,
                         "choosable": True,
-                        "current_position": Player.get(id=6).current_position,
-                        "role": Player.get(id=6).role,
-                        "is_voldemort": Player.get(id=6).is_voldemort,
+                        "current_position": player2.current_position,
+                        "role": player2.role,
+                        "is_voldemort": player2.is_voldemort,
                         "alive": True,
                         "user": {
-                            "id": 2,
+                            "id": pytest.users[2]["user_id"],
                             "username": "andres2",
                             "useralias": "andres2"
                         },
-                        "game": 1
+                        "game": pytest.info['game']
                     }
                 ]
             }
@@ -277,8 +301,8 @@ def test_status_game():
     'Content-Type': 'text/plain'
     }
     with db_session:
-        minister = int(Game.get(id=1).status["minister"])
-    response = client.get("/games/1/status", headers=headers)
+        minister = int(Game.get(id=pytest.info['game']).status["minister"])
+    response = client.get(f"/games/{pytest.info['game']}/status", headers=headers)
     assert response.status_code == 200
     assert response.json() == {
     "minister": minister,
@@ -294,21 +318,22 @@ def test_me_game():
     'Authorization': 'Bearer ' + pytest.users[1]["token"],
     'Content-Type': 'text/plain'
     }
-    response = client.get("/games/1/me", headers=headers)
+    response = client.get(f"/games/{pytest.info['game']}/me", headers=headers)
     with db_session:
-        current_position = Player.get(id=1).current_position
-        role = Player.get(id=1).role
-        voldemort = Player.get(id=1).is_voldemort
+        player = Player.get(id=pytest.users[1]["player_id"])
+        current_position = player.current_position
+        role = player.role
+        voldemort = player.is_voldemort
     assert response.status_code == 200
     assert response.json() == {
-        "id": 1,
+        "id": pytest.users[1]["player_id"],
         "choosable": True,
         "current_position": current_position,
         "role": role,
         "is_voldemort": voldemort,
         "alive": True,
-        "user": 1,
-        "game": 1
+        "user": pytest.users[1]["user_id"],
+        "game": pytest.info['game']
     }
     response = client.get("/games/100/me", headers=headers)
     assert response.status_code == 404
@@ -320,13 +345,15 @@ def test_board_game():
     'Authorization': 'Bearer ' + pytest.users[1]["token"],
     'Content-Type': 'text/plain'
     }
-    response = client.get("/games/1/board", headers=headers)
+    response = client.get(f"/games/{pytest.info['game']}/board", headers=headers)
     with db_session:
-        current_position = Player.get(id=1).current_position
-        minister = int(Game.get(id=1).status["minister"])
+        current_position = Player.get(id=pytest.users[1]["player_id"]).current_position
+        game = Game.get(id=pytest.info['game'])
+        board = game.board.id
+        minister = int(game.status["minister"])
     assert response.status_code == 200
     assert response.json() == {
-            "id": 1,
+            "id": board,
             "de_proc": 0,
             "po_proc": 0,
             "spell_fields": [
@@ -338,7 +365,7 @@ def test_board_game():
                 "win"
             ],
             "caos": 0,
-            "game": 1
+            "game": pytest.info['game']
     }
     response = client.get("/games/100/board", headers=headers)
     assert response.status_code == 404
@@ -350,8 +377,8 @@ def test_deck_game():
     'Content-Type': 'text/plain'
     }
     with db_session:
-        deck = Game.get(id=1).board.deck
-    response = client.get("/games/1/deck", headers=headers)
+        deck = Game.get(id=pytest.info['game']).board.deck
+    response = client.get(f"/games/{pytest.info['game']}/deck", headers=headers)
     assert response.status_code == 200
     assert response.json() == deck
     response = client.get("/games/100/deck", headers=headers)
@@ -360,92 +387,98 @@ def test_deck_game():
 
 def test_choosehm_game():
     with db_session:
-        game = Game.get(id=1)
+        game = Game.get(id=pytest.info['game'])
         minister = game.status["minister"]
         game.status["phase"] = "x"
     headers = {
-    'Authorization': 'Bearer ' + pytest.users[minister]["token"],
+    'Authorization': 'Bearer ' + pytest.users[1]["token"],
     'Content-Type': 'text/plain'
     }
     response = client.post("/games/100/choosehm", headers=headers,
     json={'id':'2'})
     assert response.status_code == 404
     assert response.json() == {'detail': "Game not found"}
-    response = client.post("/games/1/choosehm", headers=headers,
+    response = client.post(f"/games/{pytest.info['game']}/choosehm", headers=headers,
     json={'id':'2'})
     assert response.status_code == 400
     assert response.json() == {
         'detail': "The headmaster only can be elected in the propose phase"}
     with db_session:
-        game = Game.get(id=1)
+        game = Game.get(id=pytest.info['game'])
         game.status["phase"] = "propose"
-    acc = minister
-    acc = (acc % 5) + 1
-    if acc == 2:
-        acc = 3
+    for i in pytest.users.keys():
+        if pytest.users[i]["player_id"] != minister:
+            acc = i
+            break 
     headers['Authorization'] = 'Bearer ' + pytest.users[acc]["token"]
-    response = client.post("/games/1/choosehm", headers=headers,
+    response = client.post(f"/games/{pytest.info['game']}/choosehm", headers=headers,
     json={'id':'2'})
     assert response.status_code == 400
     assert response.json() == {
         'detail': "Only the minister can propose a headmaster"}
-    headers['Authorization'] = 'Bearer ' + pytest.users[minister]["token"]
+    for i in pytest.users.keys():
+        if pytest.users[i]["player_id"] == minister:
+            user_minister = i
+            break 
+    headers['Authorization'] = 'Bearer ' + pytest.users[user_minister]["token"]
     response = client.post(
-    "/games/1/choosehm", headers=headers,
+    f"/games/{pytest.info['game']}/choosehm", headers=headers,
     json={"id": "300"}
     )
     assert response.status_code == 400
     assert response.json() == {
         'detail': "The selected player does not exist"}
     response = client.post(
-    "/games/1/choosehm", headers=headers,
+    f"/games/{pytest.info['game']}/choosehm", headers=headers,
     json={"id": str(minister)}
     )
     assert response.status_code == 400
     assert response.json() == {
         'detail': "The minister can not be the headmaster"}
     with db_session:
-        other_guy = Player.get(id=acc)
+        other_guy = Player.get(id=pytest.users[acc]["player_id"])
         other_guy.choosable = False
     response = client.post(
-    "/games/1/choosehm", headers=headers,
-    json={"id": str(acc)}
+    f"/games/{pytest.info['game']}/choosehm", headers=headers,
+    json={"id": str(pytest.users[acc]["player_id"])}
     )
     assert response.status_code == 400
     assert response.json() == {
         'detail': "The player has been headmaster in the previous round"}
     with db_session:
-        user = User.get(id=Player.get(id=minister).user.id)
-        new_game = Game(name="x", created_by=1, started=False,
+        user = User.get(id=pytest.users[user_minister]["user_id"])
+        new_game = Game(name="x", created_by=pytest.users[acc]["user_id"], started=False,
                     creation_date=datetime.datetime.now(),
                     player_amount=5, status={})
         new_player = Player(choosable=True, current_position='', role='', is_voldemort=False, alive=True,
                         user=user)
         new_game.players.add(new_player)
-        other_guy = Player.get(id=acc)
+        other_guy = Player.get(id=pytest.users[acc]["player_id"])
         other_guy.choosable = True
         other_guy.alive = False
         commit()
+    pytest.info['other_game'] = new_game.id
+    pytest.info['other_player'] = new_player.id
     response = client.post(
-    "/games/1/choosehm", headers=headers,
+    f"/games/{pytest.info['game']}/choosehm", headers=headers,
     json={"id": str(new_player.id)}
     )
     assert response.status_code == 400
     assert response.json() == {
         'detail': "The player does not belong to this game"}
     response = client.post(
-    "/games/1/choosehm", headers=headers,
+    f"/games/{pytest.info['game']}/choosehm", headers=headers,
     json={"id": str(other_guy.id)}
     )
     assert response.status_code == 400
     assert response.json() == {
         'detail': "The player cannot be headmaster because is dead"}
     with db_session:
-        other_guy = Player.get(id=acc)
+        other_guy = Player.get(id=pytest.users[acc]["player_id"])
         other_guy.alive = True
         username = other_guy.user.username
     response = client.post(
-    "/games/1/choosehm", headers=headers,
+    f"/games/{pytest.info['game']}/choosehm", headers=headers,
     json={"id": str(other_guy.id)}
     )
     assert response.status_code == 200
@@ -464,22 +497,22 @@ def test_vote_game():
     assert response.status_code == 404
     assert response.json() == {'detail': "Game not found"}
     with db_session:
-        game = Game.get(id=1)
+        game = Game.get(id=pytest.info['game'])
         game.status["phase"] = "x"
-    response = client.post("/games/1/vote", headers=headers,
+    response = client.post(f"/games/{pytest.info['game']}/vote", headers=headers,
     json={"vote":"true"})
     assert response.status_code == 400
     assert response.json() == {'detail': "It is not the vote phase"}
     with db_session:
-        game = Game.get(id=1)
+        game = Game.get(id=pytest.info['game'])
         game.status["phase"] = "vote"
-    response = client.post("/games/1/vote", headers=headers,
+    response = client.post(f"/games/{pytest.info['game']}/vote", headers=headers,
         json={"vote": "true"})
     assert response.status_code == 200
     assert response.json() == {
-        "vote": "Player: 1 (andres) successfully voted",
+        "vote": f"Player: {pytest.users[1]['player_id']} (andres) successfully voted",
         "election": "election in progress"}
-    response = client.post("/games/1/vote", headers=headers,
+    response = client.post(f"/games/{pytest.info['game']}/vote", headers=headers,
         json={"vote": "true"})
     assert response.status_code == 400
     assert response.json() == {
@@ -488,92 +521,95 @@ def test_vote_game():
     for i in list(pytest.users.keys())[1:-2]:
         headers['Authorization'] = 'Bearer ' + pytest.users[i]["token"]
         response = client.post(
-            "/games/1/vote", headers=headers,
+            f"/games/{pytest.info['game']}/vote", headers=headers,
             json={"vote": f"{votes[i%2]}"}
         )
         assert response.status_code == 200
-        j = i
-        if i == 2:
-            j = 6
         assert response.json() == {
-        "vote": f"Player: {j} (andres{i}) successfully voted",
+        "vote": f"Player: {pytest.users[i]['player_id']} ({pytest.users[i]['username']}) successfully voted",
         "election": "election in progress"}
     with db_session:
-        old_status = Game.get(id=1).status.copy()
+        old_status = Game.get(id=pytest.info['game']).status.copy()
         headers['Authorization'] = 'Bearer ' + pytest.users[5]["token"]
-        Game.get(id=1).status = old_status
+        Game.get(id=pytest.info['game']).status = old_status
         response = client.post(
-            "/games/1/vote", headers=headers,
+            f"/games/{pytest.info['game']}/vote", headers=headers,
             json={"vote": "false"}
         )
         assert response.status_code == 200
         assert response.json() == {
-        "vote": f"Player: {5} (andres{5}) successfully voted",
+        "vote": f"Player: {pytest.users[5]['player_id']} ({pytest.users[5]['username']}) successfully voted",
         "election": "election failed"}
-        game = Game.get(id=1)
+        game = Game.get(id=pytest.info['game'])
         game.board.caos -= 1
         Player.get(id=game.status['minister']).current_position = ""
         game.status = old_status
         Player.get(id=old_status['minister']).current_position = "minister"
         Player.get(id=int(old_status['headmaster'])).current_position = "headmaster"
         response = client.post(
-            "/games/1/vote", headers=headers,
+            f"/games/{pytest.info['game']}/vote", headers=headers,
             json={"vote": "true"}
         )
         assert response.status_code == 200
         assert response.json() == {
-        "vote": f"Player: {5} (andres{5}) successfully voted",
+        "vote": f"Player: {pytest.users[5]['player_id']} ({pytest.users[5]['username']}) successfully voted",
         "election": "election succeed"}
 
 def test_get_proclamations_game():
     with db_session:
-        game = Game.get(id=1)
+        game = Game.get(id=pytest.info["game"])
         minister = game.status['minister']
         headmaster = int(game.status['headmaster'])
-        otherguy = [1,3,4,5,6]
-        otherguy.remove(headmaster)
-        otherguy.remove(minister)
-        otherguy = otherguy[0]
-        print(otherguy)
+        for i in pytest.users.keys():
+            if pytest.users[i]["player_id"] != minister and pytest.users[i]["player_id"] != headmaster:
+                acc = i
+                break
         headers = {
-        'Authorization': 'Bearer ' + pytest.users[otherguy]["token"],
+        'Authorization': 'Bearer ' + pytest.users[acc]["token"],
         'Content-Type': 'text/plain'
         }
         game.status["phase"] = "x"
-        response = client.get("/games/1/proclamations", headers=headers)
+        response = client.get(f"/games/{pytest.info['game']}/proclamations", headers=headers)
         assert response.status_code == 400
         assert response.json() == {'detail': "It is not a phase for geting a proclamation"}
         game.status["phase"] = "minister play"
-        response = client.get("/games/1/proclamations", headers=headers)
+        response = client.get(f"/games/{pytest.info['game']}/proclamations", headers=headers)
         print(response.json())
         assert response.status_code == 404
         assert response.json() == {'detail': "This player is not the minister"}
-        headers['Authorization'] = 'Bearer ' + pytest.users[minister]["token"]
-        response = client.get("/games/1/proclamations", headers=headers)
+        for i in pytest.users.keys():
+            if pytest.users[i]["player_id"] == minister:
+                user_minister = i
+                break
+        headers['Authorization'] = 'Bearer ' + pytest.users[user_minister]["token"]
+        response = client.get(f"/games/{pytest.info['game']}/proclamations", headers=headers)
         assert response.status_code == 200
         assert response.json() == {"data": game.board.deck.split(',')[:3]}
         game.status["phase"] = "headmaster play"
-        response = client.get("/games/1/proclamations", headers=headers)
+        response = client.get(f"/games/{pytest.info['game']}/proclamations", headers=headers)
         assert response.status_code == 404
         assert response.json() == {'detail': "This player is not the headmaster"}
-        headers['Authorization'] = 'Bearer ' + pytest.users[headmaster]["token"]
-        response = client.get("/games/1/proclamations", headers=headers)
+        for i in pytest.users.keys():
+            if pytest.users[i]["player_id"] == headmaster:
+                user_headmaster = i
+                break
+        headers['Authorization'] = 'Bearer ' + pytest.users[user_headmaster]["token"]
+        response = client.get(f"/games/{pytest.info['game']}/proclamations", headers=headers)
         assert response.status_code == 200
         assert response.json() == {"data": game.board.deck.split(',')[:2]}
 
 
 def test_post_game_proclamations():
     with db_session:
-        game = Game.get(id=1)
+        game = Game.get(id=pytest.info['game'])
         minister = game.status['minister']
         headmaster = int(game.status['headmaster'])
-        otherguy = [1,3,4,5,6]
-        otherguy.remove(headmaster)
-        otherguy.remove(minister)
-        otherguy = otherguy[0]
-        print(otherguy)
+        for i in pytest.users.keys():
+            if pytest.users[i]["player_id"] != minister and pytest.users[i]["player_id"] != headmaster:
+                acc = i
+                break
         headers = {
-        'Authorization': 'Bearer ' + pytest.users[otherguy]["token"],
+        'Authorization': 'Bearer ' + pytest.users[acc]["token"],
         'Content-Type': 'text/plain'
         }
         response = client.post("/games/100/proclamations", headers=headers,
@@ -581,37 +617,116 @@ def test_post_game_proclamations():
         assert response.status_code == 404
         assert response.json() == {'detail': "Game not found"}
         game.status["phase"] = "x"
-        response = client.post("/games/1/proclamations", headers=headers,
+        response = client.post(f"/games/{pytest.info['game']}/proclamations", headers=headers,
         json={"card":""})
         assert response.status_code == 400
         assert response.json() == {'detail': "It is not a phase for playing a proclamation"}
         game.status["phase"] = "minister play"
-        response = client.post("/games/1/proclamations", headers=headers,
+        response = client.post(f"/games/{pytest.info['game']}/proclamations", headers=headers,
         json={"card":""})
         assert response.status_code == 404
         assert response.json() == {'detail': "This player is not the minister"}
-        headers['Authorization'] = 'Bearer ' + pytest.users[minister]["token"]
-        response = client.post("/games/1/proclamations", headers=headers,
+        for i in pytest.users.keys():
+            if pytest.users[i]["player_id"] == minister:
+                user_minister = i
+                break
+        headers['Authorization'] = 'Bearer ' + pytest.users[user_minister]["token"]
+        response = client.post(f"/games/{pytest.info['game']}/proclamations", headers=headers,
         json={"card":""})
         assert response.status_code == 400
         assert response.json() == {'detail': "The input card was not one of the options"}
         card = game.board.deck.split(',')[:3][0]
-        response = client.post("/games/1/proclamations", headers=headers,
+        response = client.post(f"/games/{pytest.info['game']}/proclamations", headers=headers,
         json={"card":card})
         assert response.status_code == 200
         assert response.json() == {'message': f'{card} card discarded successfully'}
-        headers['Authorization'] = 'Bearer ' + pytest.users[otherguy]["token"]
-        response = client.post("/games/1/proclamations", headers=headers,
+        headers['Authorization'] = 'Bearer ' + pytest.users[acc]["token"]
+        response = client.post(f"/games/{pytest.info['game']}/proclamations", headers=headers,
         json={"card":""})
         assert response.status_code == 404
         assert response.json() == {'detail': "This player is not the headmaster"}
-        headers['Authorization'] = 'Bearer ' + pytest.users[headmaster]["token"]
-        response = client.post("/games/1/proclamations", headers=headers,
+        for i in pytest.users.keys():
+            if pytest.users[i]["player_id"] == headmaster:
+                user_headmaster = i
+                break
+        headers['Authorization'] = 'Bearer ' + pytest.users[user_headmaster]["token"]
+        response = client.post(f"/games/{pytest.info['game']}/proclamations", headers=headers,
         json={"card":"defaef"})
+        print(response.json())
         assert response.status_code == 400
         assert response.json() == {'detail': "The input card was not one of the options"}
         card = game.board.deck.split(',')[:2][0]
-        response = client.post("/games/1/proclamations", headers=headers,
+        response = client.post(f"/games/{pytest.info['game']}/proclamations", headers=headers,
         json={"card":card})
         assert response.status_code == 200
         assert response.json() == {'message': f'{card} card played successfully'}
+
+def test_get_divination():
+    with db_session:
+        headers = {
+        'Authorization': 'Bearer ' + pytest.users[1]["token"],
+        'Content-Type': 'text/plain'
+        }
+        #response = client.get("/games/100/divination", headers=headers)
+        game = Game.get(id=pytest.info['game'])
+        game.status["minister"]
+
+def test_user_get():
+    headers = {
+        'Authorization': 'Bearer ' + pytest.users[1]["token"],
+        'Content-Type': 'text/plain'
+    }
+    response = client.get("/users/me", headers=headers)
+    response.status_code == 200
+    with db_session:
+        user = User.get(id=pytest.users[1]["user_id"])
+    response.json() == {
+        "id": user.id, "username": user.username,
+        "useralias": user.useralias, "email": user.email}
+
+
+def test_users_get():
+    headers = {
+        'Authorization': 'Bearer ' + pytest.users[1]["token"],
+        'Content-Type': 'text/plain'
+    }
+    with db_session:
+        users = User.select()[:]
+        result = {'data': [{"id": u.id, "email": u.email, "username": u.username} for u in users]}
+        response = client.get("/users", headers=headers)
+        assert response.status_code == 200
+        assert response.json() == result
+
+def test_user_put():
+    headers = {
+        'Authorization': 'Bearer ' + pytest.users[1]["token"],
+        'Content-Type': 'text/plain'
+    }
+    j = {
+    "useralias": "andresito",
+    "oldpassword": "123456",
+    "newpassword": "123456"
+    }
+
+
+
+def test_delete_game():
+    headers = {
+        'Authorization': 'Bearer ' + pytest.users[2]["token"],
+        'Content-Type': 'text/plain'
+    }
+    response = client.delete("/games/100/delete", headers=headers)
+    assert response.status_code == 404
+    assert response.json() == {'detail': 'The game does not exist'}
+    response = client.delete(f"/games/{pytest.info['game']}/delete", headers=headers)
+    assert response.status_code == 403
+    assert response.json() == {'detail': 'The game does not belong to the current user'}
+    headers['Authorization'] = 'Bearer ' + pytest.users[1]["token"]
+    response = client.delete(f"/games/{pytest.info['game']}/delete", headers=headers)
+    assert response.status_code == 200
+    assert response.json() == {"message": f"The game {pytest.info['game']} (Partida 1) was deleted"}
+    with db_session:
+        Player.get(id=pytest.info['other_player']).delete()
+        Game.get(id=pytest.info['other_game']).delete()
+        for u in list(pytest.users.values())[:-1]:
+            User.get(id=u["user_id"]).delete()
