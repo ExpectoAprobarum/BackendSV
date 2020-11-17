@@ -6,7 +6,8 @@ from fastapi import HTTPException
 
 def fire_headmaster(game):
     player_query = Player.select(lambda pr: pr.current_position == 'headmaster')
-    game.status["headmaster"] = ""
+    if 'headmaster' in game.status.keys():
+        del game.status["headmaster"]
     for p in player_query:
         p.current_position = ""
 

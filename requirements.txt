@@ -4,3 +4,5 @@ hypercorn
 pyjwt
 passlib[bcrypt]
 fastapi_login
+fastapi-mail
+itsdangerous

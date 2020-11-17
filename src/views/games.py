@@ -206,7 +206,7 @@ async def choose_headmaster(headmaster: PlayerM, game_id: int, user=Depends(mana
         if not new_hm.alive:
             raise HTTPException(status_code=400, detail="The player cannot be headmaster because is dead")
         Player.reset_choosable()
-        status["headmaster"] = headmaster.id
+        status["headmaster"] = int(headmaster.id)
         # PASS THE TURN ####################
         status["phase"] = "vote"
         #####################################
@@ -243,7 +243,7 @@ async def vote(in_vote: VoteM, game_id: int, user=Depends(manager)):
         username = user["username"]
         player_msg = f"Player: {pid} ({username}) successfully voted"
         general_msg = "election in progress"
-        if len(game.status["votes"]) == game.players.count():
+        if len(game.status["votes"]) == game.players.select(lambda p: p.alive).count():
             nox_votes = 0
             lumos_votes = 0
             for v in game.status["votes"]:

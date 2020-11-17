@@ -8,4 +8,5 @@ class User(db.Entity):
     username = Optional(str, unique=True)
     useralias = Required(str)
     email = Required(str, unique=True)
+    verified = Required(bool, default=False)
     players = Set('Player')
