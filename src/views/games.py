@@ -32,8 +32,13 @@ class MessageM(BaseModel):
 @router.get("/")
 async def get_games(user=Depends(manager)):
     with db_session:
+        def parseGame(game):
+            game_dict = game.to_dict()
+            players = game.players.count()
+            game_dict["joined_players"] = players
+            return game_dict
         games = Game.select()[:]
-        result = {'data': [g.to_dict() for g in games if not g.started]}
+        result = {'data': [parseGame(g) for g in games if not g.started]}
     return result
 
 
