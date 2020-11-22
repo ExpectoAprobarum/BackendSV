@@ -93,9 +93,14 @@ def test_get_games():
         json={}
     )
     with db_session:
+        def parseGame(game):
+            game_dict = game.to_dict()
+            players = game.players.count()
+            game_dict["joined_players"] = players
+            return game_dict
         creation_date = str(Game.get(id=pytest.info['game']).creation_date).replace(" ","T")
         games = Game.select()[:]
-        result = {'data': [g.to_dict() for g in games if not g.started]}
+        result = {'data': [parseGame(g) for g in games if not g.started]}
     print(type(result["data"][0]["creation_date"]))
     for g in result["data"]:
         g["creation_date"] = str(g["creation_date"]).replace(" ","T")
