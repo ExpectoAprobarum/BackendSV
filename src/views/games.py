@@ -1,8 +1,8 @@
 import datetime
-from pony.orm import db_session, commit
+from pony.orm import db_session, commit, desc
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from src.models import Game, Board, User, Player
+from src.models import Game, Board, User, Player, Message
 from src.services import manager
 
 router = APIRouter()
@@ -23,6 +23,10 @@ class VoteM(BaseModel):
 
 class ProcM(BaseModel):
     card: str
+
+
+class MessageM(BaseModel):
+    content: str
 
 
 @router.get("/")
@@ -388,8 +392,20 @@ async def play_divination(game_id: int, user=Depends(manager)):
             raise HTTPException(status_code=400, detail=f"This player is not the minister")
         if game.board.de_proc == 0 or deck[game.board.de_proc - 1] != "divination":
             raise HTTPException(status_code=400, detail="The divination spell is not available")
-        Player.reassign_minister(game)
         return {"data": game.board.deck.split(",")[:3]}
+
+
+# THIS ENDPOINT ENDS THE TURN FOR DIVINATION AND TEST PURPOSES, USE CAREFULLY!!!
+@router.post("/{game_id}/endturn")
+async def end_turn(game_id: int, user=Depends(manager)):
+    with db_session:
+        game = Game.get(id=game_id)
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        if not game.started:
+            raise HTTPException(status_code=400, detail="Game is not started")
+        Player.reassign_minister(game)
+        return {"message": "Turn ended!"}
 
 @router.post("/{game_id}/avadakedavra")
 async def kill_player(player_id: PlayerM, game_id: int, user=Depends(manager)):
@@ -408,14 +424,68 @@ async def kill_player(player_id: PlayerM, game_id: int, user=Depends(manager)):
         if not victim_player:
             raise HTTPException(status_code=400, detail="The victim player does not belong to this game")
         if current_player["current_position"] != "minister":
-                raise HTTPException(status_code=404, detail="This player is not the minister")
+            raise HTTPException(status_code=404, detail="This player is not the minister")
         if player_id.id == current_player["id"]:
             raise HTTPException(status_code=400, detail="You aren't allowed to kill this user")
         victim_player.alive = False
         if victim_player.is_voldemort:
-            game.status = {"info": "game ended", "winner": "Phoenix Order"}
+            game.status = {"info": "game ended", "winner": "Phoenix Order", "detail": "voldemort killed"}
         else:
             Player.reassign_minister(game)
         victim_user = User.select(
             lambda u: u.id == victim_player.user.id).first()
-        return {"avadakedavra": "succed!", "dead_player_id": player_id.id , "dead_player_alias": victim_user.useralias}
+        return {"avadakedavra": "succed!", "dead_player_id": player_id.id, "dead_player_alias": victim_user.useralias}
+
+
+@router.get("/{game_id}/messages")
+async def all_messages(game_id: int, user=Depends(manager)):
+    with db_session:
+        game = Game.get(id=game_id)
+        Player.user_player(user, game_id)
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        if not game.started:
+            raise HTTPException(status_code=400, detail="Game is not started")
+        chats = game.chats.order_by(lambda c: desc(c.date))
+        return {'data': [{"content": m.content, "date": m.date, "send_by": m.player.to_dict()} for m in chats]}
+
+
+@router.post("/{game_id}/messages")
+async def write_message(msg_content: MessageM, game_id: int, user=Depends(manager)):
+    with db_session:
+        game = Game.get(id=game_id)
+        current_player = Player.user_player(user, game_id)
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        if not game.started:
+            raise HTTPException(status_code=400, detail="Game is not started")
+        Message(date=datetime.datetime.now(), content=msg_content.content, game=game_id, player=current_player["id"])
+        return {"detail": "the message was recorder successfully"}
+
+
+@router.post("/{game_id}/imperius")
+async def play_imperius(obj_player: PlayerM, game_id: int, user=Depends(manager)):
+    with db_session:
+        game = Game.get(id=game_id)
+        current_player = Player.user_player(user, game_id)
+        objective_player = game.players.select(lambda p: p.id == obj_player.id and p.game.id == game.id).first()
+        board = game.board.spell_fields.split(",")
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        if not game.started:
+            raise HTTPException(status_code=400, detail="Game is not started")
+        if game.status["phase"] != "spell play":
+            raise HTTPException(status_code=400, detail="Its not time for playing spells!")
+        if current_player["current_position"] != "minister":
+            raise HTTPException(status_code=400, detail=f"This player is not the minister")
+        if game.board.de_proc == 0 or board[game.board.de_proc - 1] != "imperius":
+            raise HTTPException(status_code=400, detail="The imperius spell is not available")
+        if not objective_player:
+            raise HTTPException(status_code=400, detail="The objective player does not belong to this game")
+        if not objective_player.alive:
+            raise HTTPException(status_code=400, detail="The objective player is dead")
+        game.status["temporal_minister"] = objective_player.id
+        game.status["return_minister"] = current_player["id"]
+        Player.reassign_minister(game)
+        return {"message": f"The player {objective_player.id} ({objective_player.user.username}) is going to be the "
+                           f"next minister!"}
