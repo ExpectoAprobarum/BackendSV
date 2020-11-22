@@ -267,8 +267,7 @@ async def vote(in_vote: VoteM, game_id: int, user=Depends(manager)):
                 new_hm = Player.get(id=game.status["headmaster"])
                 if new_hm and (game.player_amount == 5 or game.player_amount == 6)\
                         and game.board.de_proc > 3 and new_hm.is_voldemort:
-                    game.status = {"info": "game ended", "winner": "Death Eaters", "detail": "voldemort was choosen "
-                                                                                             "as headmaster"}
+                    game.status = {"info": "game ended", "winner": "Death Eaters", "detail": "voldemort headmaster"}
                     return {"vote": player_msg, "election": general_msg}
                 ######################################
             else:
