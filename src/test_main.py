@@ -688,10 +688,10 @@ def test_user_get():
         'Content-Type': 'text/plain'
     }
     response = client.get("/users/me", headers=headers)
-    response.status_code == 200
+    assert response.status_code == 200
     with db_session:
         user = User.get(id=pytest.users[1]["user_id"])
-    response.json() == {
+    assert response.json() == {
         "id": user.id, "username": user.username,
         "useralias": user.useralias, "email": user.email}
 
@@ -715,9 +715,21 @@ def test_user_put():
     }
     j = {
     "useralias": "andresito",
-    "oldpassword": "123456",
+    "oldpassword": "12345",
     "newpassword": "123456"
     }
+    response = client.put("/users/", headers=headers,
+    json=j)
+    assert response.status_code == 200
+    assert response.json() == ['fields modified: -useralias -password']
+    j.pop("useralias",None)
+    response = client.put("/users/", headers=headers,
+    json=j)
+    assert response.status_code == 400
+    assert response.json() == {'detail': "Old password dont match"}
+
+def test_post_msg():
+    pass
 
 
 
