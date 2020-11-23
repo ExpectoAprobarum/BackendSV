@@ -395,7 +395,6 @@ async def play_crucio(player_id: PlayerM, game_id: int, user=Depends(manager)):
         victim_user = User.select(
             lambda u: u.id == victim_player.user.id).first()
         role = victim_player.role
-        Player.reassign_minister(game)
         return {"role": role, "player_id": player_id.id , "player_alias": victim_user.useralias}
 
 @router.get("/{game_id}/divination")
