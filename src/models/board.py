@@ -15,8 +15,8 @@ class Board(db.Entity):
     @staticmethod
     def define_board(player_amount):
         five_six_players = ['', '', 'divination', 'avadakedavra', 'avadakedavra', 'win']
-        seven_eight_players = ['', 'crucio', 'imperio', 'avadakedavra', 'avadakedavra', 'win']
-        nine_ten_players = ['crucio', 'crucio', 'imperio', 'avadakedavra', 'avadakedavra', 'win']
+        seven_eight_players = ['', 'crucio', 'imperius', 'avadakedavra', 'avadakedavra', 'win']
+        nine_ten_players = ['crucio', 'crucio', 'imperius', 'avadakedavra', 'avadakedavra', 'win']
 
         return {
             5: five_six_players,

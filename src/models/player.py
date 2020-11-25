@@ -66,16 +66,28 @@ class Player(db.Entity):
             game.board.spell_fields = ','.join(spell_fields)
 
         if game.board.de_proc == 6:
-            game.status = {"info": "game ended", "winner": "Death Eaters"}
+            game.status = {"info": "game ended", "winner": "Death Eaters", "detail": "Death eater proclamations"}
         elif game.board.po_proc == 5:
-            game.status = {"info": "game ended", "winner": "Phoenix Order"}
+            game.status = {"info": "game ended", "winner": "Phoenix Order", "detail": "Phoenix order proclamations"}
         else:
+            game_keys = game.status.keys()
+            # The return path is the case when a Imperius spell is casted and we need to return the round original order
+            return_path = 'temporal_minister' not in game_keys and 'return_minister' in game_keys
+
             for i, mId in enumerate(players_array):
-                if mId == minister_id:
-                    if (i + 1) == len(players_array):
-                        game.status["minister"] = players_array[0]
+                if mId == minister_id or (return_path and mId == game.status["return_minister"]):
+                    if 'temporal_minister' in game_keys and 'return_minister' in game_keys:
+                        game.status["minister"] = game.status["temporal_minister"]
+                        del game.status["temporal_minister"]
                     else:
-                        game.status["minister"] = players_array[i + 1]
+                        if (i + 1) == len(players_array):
+                            game.status["minister"] = players_array[0]
+                        else:
+                            game.status["minister"] = players_array[i + 1]
+                        # Delete the return minister, the game will continue like usual
+                        if 'return_minister' in game_keys:
+                            del game.status["return_minister"]
+
                     game.status["phase"] = "propose"
                     game.status["round"] += 1
 
