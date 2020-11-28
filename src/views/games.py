@@ -328,7 +328,7 @@ async def play(proc: ProcM, game_id: int, user=Depends(manager)):
                 # IMPORTANT! HERE GOES THE LOGIC FOR SPELL ACTIVATION
                 # PASS THE TURN ###########
                 spell_fields = game.board.spell_fields.split(",")
-                spells = ["divination", "avadakedavra"]
+                spells = ["divination", "avadakedavra", "crucio", "imperio"]
                 if game.board.de_proc != 0 and spell_fields[game.board.de_proc - 1] in spells:
                     game.status["phase"] = "spell play"
                 else:
@@ -395,7 +395,7 @@ async def play_crucio(player_id: int, game_id: int, user=Depends(manager)):
         victim_user = User.select(
             lambda u: u.id == victim_player.user.id).first()
         role = victim_player.role
-        return {"role": role, "player_id": player_id.id , "player_alias": victim_user.useralias}
+        return {"role": role, "player_id": player_id , "player_alias": victim_user.useralias}
 
 @router.get("/{game_id}/divination")
 async def play_divination(game_id: int, user=Depends(manager)):
