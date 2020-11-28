@@ -93,6 +93,8 @@ class Player(db.Entity):
 
                     fired_minister = Player.get(id=minister_id)
                     fired_minister.current_position = ""
+                    if len(players_array) > 5:
+                        fired_minister.choosable = False
 
                     new_minister = Player.get(id=game.status["minister"])
                     new_minister.current_position = "minister"
