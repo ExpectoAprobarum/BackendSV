@@ -372,13 +372,13 @@ async def get_current_player(game_id: int, user=Depends(manager)):
         return Player.user_player(user, game_id)
 
 
-@router.get("/{game_id}/crucio")
-async def play_crucio(player_id: PlayerM, game_id: int, user=Depends(manager)):
+@router.get("/{game_id}/crucio/{player_id}")
+async def play_crucio(player_id: int, game_id: int, user=Depends(manager)):
     with db_session:
         game = Game.get(id=game_id)
         current_player = Player.user_player(user, game_id)
         victim_player = Player.select(
-            lambda p: p.id == player_id.id and p.game.id == game_id).first()
+            lambda p: p.id == player_id and p.game.id == game_id).first()
         deck = game.board.spell_fields.split(",")
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
