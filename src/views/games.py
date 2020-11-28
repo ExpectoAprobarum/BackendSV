@@ -276,7 +276,7 @@ async def vote(in_vote: VoteM, game_id: int, user=Depends(manager)):
                 # PASS THE TURN #####################
                 game.board.caos = game.board.caos + 1
                 general_msg = "election failed"
-                # WRITE ACTIONS TO DO IF CAOS IS EQUAL TO 5
+                # ACTIONS TO DO IF CAOS IS EQUAL TO 3
                 if game.board.caos == 3:
                     deck = game.board.deck.split(',')
                     first_card = deck[:1]
@@ -288,8 +288,8 @@ async def vote(in_vote: VoteM, game_id: int, user=Depends(manager)):
                     game.board.caos = 0
                     general_msg = "government caos"
                     Player.reset_choosable()
-                Player.reassign_minister(game)
                 #####################################
+                Player.reassign_minister(game)
         return {"vote": player_msg, "election": general_msg}
 
 
