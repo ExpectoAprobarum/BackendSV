@@ -486,7 +486,7 @@ async def kill_player(player_id: PlayerM, game_id: int, user=Depends(manager)):
             Player.reassign_minister(game)
         victim_user = User.select(
             lambda u: u.id == victim_player.user.id).first()
-        return {"avadakedavra": "succed!", "dead_player_id": player_id.id, "dead_player_alias": victim_user.useralias}
+        return {"avadakedavra": "succeed!", "dead_player_id": player_id.id, "dead_player_alias": victim_user.useralias}
 
 
 @router.get("/{game_id}/messages")
@@ -582,5 +582,6 @@ async def expelliarmus(in_vote: VoteM, game_id: int, user=Depends(manager)):
                 cards = game.board.deck.split(',')[2:]
                 game.board.deck = ','.join(cards)
                 detail = "the expelliarmus was played succesfully!, cards discarded"
+                Player.reassign_minister(game)
 
         return {detail}
