@@ -107,6 +107,8 @@ class Player(db.Entity):
             del game.status["minister_expelliarmus"]
         if 'headmaster_expelliarmus' in game.status.keys():
             del game.status["headmaster_expelliarmus"]
+        if 'caos' in game.status.keys():
+            del game.status["caos"]
 
     @staticmethod
     def user_player(user, game_id):
