@@ -1,1 +1,1 @@
-web: gunicorn src.main:app --log-file=-
+web: hypercorn src.main:app --reload
