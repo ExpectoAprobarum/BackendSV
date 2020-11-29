@@ -280,14 +280,14 @@ async def vote(in_vote: VoteM, game_id: int, user=Depends(manager)):
                 if game.board.caos == 3:
                     deck = game.board.deck.split(',')
                     first_card = deck[:1]
-                    if first_card == 'death':
+                    if first_card[0] == 'death':
                         game.board.de_proc += 1
                     else:
                         game.board.po_proc += 1
                     if 'caos' in game.status.keys():
-                        game.status["caos"] = game.status["caos"] + [first_card]
+                        game.status["caos"] = game.status["caos"] + first_card
                     else:
-                        game.status["caos"] = [first_card]
+                        game.status["caos"] = first_card
                     game.board.deck = ','.join(deck[1:])
                     game.board.caos = 0
                     general_msg = "government caos"
