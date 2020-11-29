@@ -473,7 +473,7 @@ async def kill_player(player_id: PlayerM, game_id: int, user=Depends(manager)):
         if not victim_player:
             raise HTTPException(status_code=400, detail="The victim player does not belong to this game")
         if current_player["current_position"] != "minister":
-                raise HTTPException(status_code=404, detail="This player is not the minister")
+            raise HTTPException(status_code=404, detail="This player is not the minister")
         victim_player.alive = False
         if victim_player.is_voldemort:
             game.status = {"info": "game ended", "winner": "Phoenix Order", "detail": "voldemort killed"}
