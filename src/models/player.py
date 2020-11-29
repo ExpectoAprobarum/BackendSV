@@ -93,6 +93,8 @@ class Player(db.Entity):
 
                     fired_minister = Player.get(id=minister_id)
                     fired_minister.current_position = ""
+                    if len(players_array) > 5:
+                        fired_minister.choosable = False
 
                     new_minister = Player.get(id=game.status["minister"])
                     new_minister.current_position = "minister"
@@ -101,6 +103,10 @@ class Player(db.Entity):
                     break
         if 'votes' in game.status.keys():
             del game.status["votes"]
+        if 'minister_expelliarmus' in game.status.keys():
+            del game.status["minister_expelliarmus"]
+        if 'headmaster_expelliarmus' in game.status.keys():
+            del game.status["headmaster_expelliarmus"]
 
     @staticmethod
     def user_player(user, game_id):
