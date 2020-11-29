@@ -282,10 +282,12 @@ async def vote(in_vote: VoteM, game_id: int, user=Depends(manager)):
                     first_card = deck[:1]
                     if first_card == 'death':
                         game.board.de_proc += 1
-                        game.status["caos"] = "death"
                     else:
                         game.board.po_proc += 1
-                        game.status["caos"] = "phoenix"
+                    if 'caos' in game.status.keys():
+                        game.status["caos"] = game.status["caos"] + [first_card]
+                    else:
+                        game.status["caos"] = [first_card]
                     game.board.deck = ','.join(deck[1:])
                     game.board.caos = 0
                     general_msg = "government caos"
@@ -424,7 +426,8 @@ async def play_crucio(player_id: int, game_id: int, user=Depends(manager)):
         victim_user = User.select(
             lambda u: u.id == victim_player.user.id).first()
         role = victim_player.role
-        return {"role": role, "player_id": player_id , "player_alias": victim_user.useralias}
+        return {"role": role, "player_id": player_id, "player_alias": victim_user.useralias}
+
 
 @router.get("/{game_id}/divination")
 async def play_divination(game_id: int, user=Depends(manager)):
@@ -490,9 +493,9 @@ async def kill_player(player_id: PlayerM, game_id: int, user=Depends(manager)):
 async def all_messages(game_id: int, user=Depends(manager)):
     with db_session:
         def user_data(obj_player):
-            c_player = Player.get(id=obj_player.id)
-            c_user = c_player.user
+            c_user = obj_player.user
             return {"id": c_user.id, "username": c_user.username, "useralias": c_user.useralias}
+
         game = Game.get(id=game_id)
         Player.user_player(user, game_id)
         if game is None:
@@ -507,12 +510,15 @@ async def all_messages(game_id: int, user=Depends(manager)):
 async def write_message(msg_content: MessageM, game_id: int, user=Depends(manager)):
     with db_session:
         game = Game.get(id=game_id)
-        current_player = Player.user_player(user, game_id)
+        current_player = Player.select(lambda p: user["id"] == p.user.id and p.game.id == game_id).first()
         if game is None:
             raise HTTPException(status_code=404, detail="Game not found")
         if not game.started:
             raise HTTPException(status_code=400, detail="Game is not started")
-        Message(date=datetime.datetime.now(), content=msg_content.content, game=game_id, player=current_player["id"])
+        Message(date=datetime.datetime.now(),
+                content=msg_content.content,
+                game=game_id,
+                player=current_player)
         return {"detail": "the message was recorder successfully"}
 
 
