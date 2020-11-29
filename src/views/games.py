@@ -489,6 +489,10 @@ async def kill_player(player_id: PlayerM, game_id: int, user=Depends(manager)):
 @router.get("/{game_id}/messages")
 async def all_messages(game_id: int, user=Depends(manager)):
     with db_session:
+        def user_data(obj_player):
+            c_player = Player.get(id=obj_player.id)
+            c_user = c_player.user
+            return {"id": c_user.id, "username": c_user.username, "useralias": c_user.useralias}
         game = Game.get(id=game_id)
         Player.user_player(user, game_id)
         if game is None:
@@ -496,8 +500,7 @@ async def all_messages(game_id: int, user=Depends(manager)):
         if not game.started:
             raise HTTPException(status_code=400, detail="Game is not started")
         chats = game.chats.order_by(lambda c: desc(c.date))
-        user_data = {"id": user["id"], "username": user["username"], "useralias": user["useralias"]}
-        return {'data': [{"content": m.content, "date": m.date, "send_by": user_data} for m in chats]}
+        return {'data': [{"content": m.content, "date": m.date, "send_by": user_data(m.player)} for m in chats]}
 
 
 @router.post("/{game_id}/messages")
