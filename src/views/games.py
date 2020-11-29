@@ -399,6 +399,31 @@ async def get_current_player(game_id: int, user=Depends(manager)):
         return Player.user_player(user, game_id)
 
 
+@router.get("/{game_id}/crucio/{player_id}")
+async def play_crucio(player_id: int, game_id: int, user=Depends(manager)):
+    with db_session:
+        game = Game.get(id=game_id)
+        current_player = Player.user_player(user, game_id)
+        victim_player = Player.select(
+            lambda p: p.id == player_id and p.game.id == game_id).first()
+        deck = game.board.spell_fields.split(",")
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        if not game.started:
+            raise HTTPException(status_code=400, detail="Game is not started")
+        if not victim_player:
+            raise HTTPException(status_code=400, detail="The victim player does not belong to this game")
+        if game.status["phase"] != "spell play":
+            raise HTTPException(status_code=400, detail="Its not time for playing spells!")
+        if current_player["current_position"] != "minister":
+            raise HTTPException(status_code=400, detail=f"This player is not the minister")
+        if game.board.de_proc == 0 or deck[game.board.de_proc - 1] != "crucio":
+            raise HTTPException(status_code=400, detail="The crucio spell is not available")
+        victim_user = User.select(
+            lambda u: u.id == victim_player.user.id).first()
+        role = victim_player.role
+        return {"role": role, "player_id": player_id , "player_alias": victim_user.useralias}
+
 @router.get("/{game_id}/divination")
 async def play_divination(game_id: int, user=Depends(manager)):
     with db_session:
@@ -448,9 +473,7 @@ async def kill_player(player_id: PlayerM, game_id: int, user=Depends(manager)):
         if not victim_player:
             raise HTTPException(status_code=400, detail="The victim player does not belong to this game")
         if current_player["current_position"] != "minister":
-            raise HTTPException(status_code=404, detail="This player is not the minister")
-        if player_id.id == current_player["id"]:
-            raise HTTPException(status_code=400, detail="You aren't allowed to kill this user")
+                raise HTTPException(status_code=404, detail="This player is not the minister")
         victim_player.alive = False
         if victim_player.is_voldemort:
             game.status = {"info": "game ended", "winner": "Phoenix Order", "detail": "voldemort killed"}
