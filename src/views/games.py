@@ -471,7 +471,8 @@ async def all_messages(game_id: int, user=Depends(manager)):
         if not game.started:
             raise HTTPException(status_code=400, detail="Game is not started")
         chats = game.chats.order_by(lambda c: desc(c.date))
-        return {'data': [{"content": m.content, "date": m.date, "send_by": m.player.to_dict()} for m in chats]}
+        user_data = {"id": user["id"], "username": user["username"], "useralias": user["useralias"]}
+        return {'data': [{"content": m.content, "date": m.date, "send_by": user_data} for m in chats]}
 
 
 @router.post("/{game_id}/messages")
@@ -546,8 +547,6 @@ async def expelliarmus(in_vote: VoteM, game_id: int, user=Depends(manager)):
             if game.status["minister_expelliarmus"] and game.status["headmaster_expelliarmus"]:
                 cards = game.board.deck.split(',')[2:]
                 game.board.deck = ','.join(cards)
-                del game.status["minister_expelliarmus"]
-                del game.status["headmaster_expelliarmus"]
                 detail = "the expelliarmus was played succesfully!, cards discarded"
 
         return {detail}

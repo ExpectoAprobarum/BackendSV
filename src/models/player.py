@@ -103,6 +103,10 @@ class Player(db.Entity):
                     break
         if 'votes' in game.status.keys():
             del game.status["votes"]
+        if 'minister_expelliarmus' in game.status.keys():
+            del game.status["minister_expelliarmus"]
+        if 'headmaster_expelliarmus' in game.status.keys():
+            del game.status["headmaster_expelliarmus"]
 
     @staticmethod
     def user_player(user, game_id):
