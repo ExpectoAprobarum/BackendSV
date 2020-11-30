@@ -90,7 +90,7 @@ async def get_games(user=Depends(manager)):
 
 
 @router.get("/me")
-async def get_games(curr_user=Depends(manager)):
+async def get_user(curr_user=Depends(manager)):
     with db_session:
         user = User.get(id=curr_user["id"])
         return {"id": user.id, "username": user.username, "useralias": user.useralias, "email": user.email}
