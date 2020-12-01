@@ -23,6 +23,3 @@ To see swagger docs just add to the url: /docs
 ### Tests
 Run tests using:
     $ pytest -s --capture=no -vv --cov
-
-### You can find deployment of the API here:
-    http://9ed6ac3eb842.ngrok.io/
