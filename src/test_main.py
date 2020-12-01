@@ -51,7 +51,7 @@ def test_auth():
         rjson = response.json()
         assert rjson['token_type'] == 'bearer'
         u["token"] = rjson['access_token']
-        print(u["token"])
+
 
 def test_create_game():
     headers = {
@@ -101,11 +101,9 @@ def test_get_games():
         creation_date = str(Game.get(id=pytest.info['game']).creation_date).replace(" ","T")
         games = Game.select()[:]
         result = {'data': [parseGame(g) for g in games if not g.started]}
-    print(type(result["data"][0]["creation_date"]))
     for g in result["data"]:
         g["creation_date"] = str(g["creation_date"]).replace(" ","T")
     assert response.status_code == 200
-    print(response.json())
     assert response.json() == result
 
 def test_exit_game():
@@ -585,7 +583,6 @@ def test_get_proclamations_game():
         assert response.json() == {'detail': "It is not a phase for geting a proclamation"}
         game.status["phase"] = "minister play"
         response = client.get(f"/games/{pytest.info['game']}/proclamations", headers=headers)
-        print(response.json())
         assert response.status_code == 404
         assert response.json() == {'detail': "This player is not the minister"}
         for i in pytest.users.keys():
@@ -663,7 +660,6 @@ def test_post_game_proclamations():
         headers['Authorization'] = 'Bearer ' + pytest.users[user_headmaster]["token"]
         response = client.post(f"/games/{pytest.info['game']}/proclamations", headers=headers,
         json={"card":"defaef"})
-        print(response.json())
         assert response.status_code == 400
         assert response.json() == {'detail': "The input card was not one of the options"}
         card = game.board.deck.split(',')[:2][0]
