@@ -545,7 +545,6 @@ async def play_imperius(obj_player: PlayerM, game_id: int, user=Depends(manager)
             raise HTTPException(status_code=400, detail="The objective player is dead")
         game.status["temporal_minister"] = objective_player.id
         game.status["return_minister"] = current_player["id"]
-        Player.reassign_minister(game)
         return {"message": f"The player {objective_player.id} ({objective_player.user.username}) is going to be the "
                            f"next minister!"}
 

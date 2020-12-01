@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 from .main import app
 import pytest
-from src.models import Game, Board, User, Player
+from src.models import Game, Board, User, Player, Message
 from pony.orm import db_session, commit
 import datetime
 client = TestClient(app)
@@ -51,7 +51,7 @@ def test_auth():
         rjson = response.json()
         assert rjson['token_type'] == 'bearer'
         u["token"] = rjson['access_token']
-        print(u["token"])
+
 
 def test_create_game():
     headers = {
@@ -101,11 +101,9 @@ def test_get_games():
         creation_date = str(Game.get(id=pytest.info['game']).creation_date).replace(" ","T")
         games = Game.select()[:]
         result = {'data': [parseGame(g) for g in games if not g.started]}
-    print(type(result["data"][0]["creation_date"]))
     for g in result["data"]:
         g["creation_date"] = str(g["creation_date"]).replace(" ","T")
     assert response.status_code == 200
-    print(response.json())
     assert response.json() == result
 
 def test_exit_game():
@@ -585,7 +583,6 @@ def test_get_proclamations_game():
         assert response.json() == {'detail': "It is not a phase for geting a proclamation"}
         game.status["phase"] = "minister play"
         response = client.get(f"/games/{pytest.info['game']}/proclamations", headers=headers)
-        print(response.json())
         assert response.status_code == 404
         assert response.json() == {'detail': "This player is not the minister"}
         for i in pytest.users.keys():
@@ -663,7 +660,6 @@ def test_post_game_proclamations():
         headers['Authorization'] = 'Bearer ' + pytest.users[user_headmaster]["token"]
         response = client.post(f"/games/{pytest.info['game']}/proclamations", headers=headers,
         json={"card":"defaef"})
-        print(response.json())
         assert response.status_code == 400
         assert response.json() == {'detail': "The input card was not one of the options"}
         card = game.board.deck.split(',')[:2][0]
@@ -688,10 +684,10 @@ def test_user_get():
         'Content-Type': 'text/plain'
     }
     response = client.get("/users/me", headers=headers)
-    response.status_code == 200
+    assert response.status_code == 200
     with db_session:
         user = User.get(id=pytest.users[1]["user_id"])
-    response.json() == {
+    assert response.json() == {
         "id": user.id, "username": user.username,
         "useralias": user.useralias, "email": user.email}
 
@@ -715,11 +711,184 @@ def test_user_put():
     }
     j = {
     "useralias": "andresito",
-    "oldpassword": "123456",
+    "oldpassword": "12345",
     "newpassword": "123456"
     }
+    response = client.put("/users/", headers=headers,
+    json=j)
+    assert response.status_code == 200
+    assert response.json() == ['fields modified: -useralias -password']
+    j.pop("useralias",None)
+    response = client.put("/users/", headers=headers,
+    json=j)
+    assert response.status_code == 400
+    assert response.json() == {'detail': "Old password dont match"}
+
+def test_post_msg():
+    headers = {
+        'Authorization': 'Bearer ' + pytest.users[2]["token"],
+        'Content-Type': 'text/plain'
+    }
+    response = client.post(f"/games/{pytest.info['game']}/messages",headers=headers,
+        json={"content":"Hola Guachin"})
+    assert response.status_code == 200
+    assert response.json() == {"detail": 
+        "the message was recorder successfully"}
+    response = client.post(f"/games/1000/messages",headers=headers,
+        json={"content":"Hola Guachin"})
+    assert response.status_code == 404
+    assert response.json() == {'detail': 'Game not found'}
+    with db_session:
+        game = Game.get(id=pytest.info['game'])
+        game.started = False
+        response = client.post(f"/games/{pytest.info['game']}/messages",headers=headers,
+        json={"content":"Hola Guachin"})
+        assert response.status_code == 400
+        assert response.json() == {'detail': "Game is not started"}
+        game.started = True
 
 
+def test_get_msg():
+    headers = {
+        'Authorization': 'Bearer ' + pytest.users[3]["token"],
+        'Content-Type': 'text/plain'
+    }
+    with db_session:
+        date = str(Message.select(lambda u: u.game.id == pytest.info['game']).first().date)
+        date = date.replace(" ","T")
+    response = client.get(f"/games/{pytest.info['game']}/messages",
+        headers=headers)
+    assert response.status_code == 200
+    assert response.json() == {
+        "data": [
+            {
+                "content": "Hola Guachin",
+                "date": date,
+                "send_by": {
+                    "id": pytest.users[2]["user_id"],
+                    "username": "andres2",
+                    "useralias": "andres2"
+                }
+            }
+        ]
+    }
+    with db_session:
+        game = Game.get(id=pytest.info['game'])
+        game.started = False
+        response = client.get(f"/games/{pytest.info['game']}/messages",
+        headers=headers)
+        assert response.status_code == 400
+        assert response.json() == {'detail': "Game is not started"}
+        game.started = True
+
+
+def test_post_avadakedavra():
+    with db_session:
+        game = Game.get(id=pytest.info['game'])
+        player = Player.select(
+            lambda p: p.current_position == "" and p.game.id == game.id).first()
+        for i in pytest.users.keys():
+            if pytest.users[i]["user_id"] == player.user.id:
+                user = i
+                break
+        headers = {
+            'Authorization': 'Bearer ' + pytest.users[user]["token"],
+            'Content-Type': 'text/plain'
+        }
+        response = client.post(f"/games/{pytest.info['game']}/avadakedavra",
+        headers=headers,json={'id': pytest.users[2]["player_id"]})
+        assert response.status_code == 400
+        assert response.json() == {"detail": "Its not time for playing spells!"}
+        game.status["phase"] = "spell play"
+        response = client.post(f"/games/{pytest.info['game']}/avadakedavra",
+        headers=headers,json={'id': pytest.users[2]["player_id"]})
+        assert response.status_code == 400
+        assert response.json() == {"detail": "The avadakedavra spell is not available"}
+
+
+def test_get_divination():
+    with db_session:
+        game = Game.get(id=pytest.info['game'])
+        player = Player.select(
+            lambda p: p.current_position == "" and p.game.id == game.id).first()
+        for i in pytest.users.keys():
+            if pytest.users[i]["user_id"] == player.user.id:
+                user = i
+                break
+        headers = {
+            'Authorization': 'Bearer ' + pytest.users[user]["token"],
+            'Content-Type': 'text/plain'
+        }
+        game.status["phase"] = "otro estado"
+        response = client.get(f"/games/{pytest.info['game']}/divination",
+        headers=headers)
+        assert response.status_code == 400
+        assert response.json() == {"detail": "Its not time for playing spells!"}
+        game.status["phase"] = "spell play"
+        response = client.get(f"/games/{pytest.info['game']}/divination",
+        headers=headers)
+        assert response.status_code == 400
+        assert response.json() == {"detail": "This player is not the minister"}
+        game.started = False
+        response = client.get(f"/games/{pytest.info['game']}/divination",
+        headers=headers)
+        assert response.status_code == 400
+        assert response.json() == {"detail": "Game is not started"}
+        game.started = True
+
+
+def test_get_crucio():
+    with db_session:
+        game = Game.get(id=pytest.info['game'])
+        player = Player.select(
+            lambda p: p.current_position == "" and p.game.id == game.id).first()
+        for i in pytest.users.keys():
+            if pytest.users[i]["user_id"] == player.user.id:
+                user = i
+                break
+        headers = {
+            'Authorization': 'Bearer ' + pytest.users[user]["token"],
+            'Content-Type': 'text/plain'
+        }
+        game.status["phase"] = "otro estado"
+        response = client.get(f"/games/{pytest.info['game']}/crucio/4000",
+        headers=headers)
+        assert response.status_code == 400
+        assert response.json() == {"detail": "The victim player does not belong to this game"}
+        response = client.get(
+            f"/games/{pytest.info['game']}/crucio/{pytest.users[user]['player_id']}",
+            headers=headers)
+        assert response.status_code == 400
+        assert response.json() == {"detail": "Its not time for playing spells!"}
+        game.status["phase"] = "spell play"
+        game.started = False
+        response = client.get(f"/games/{pytest.info['game']}/divination",
+        headers=headers)
+        assert response.status_code == 400
+        assert response.json() == {"detail": "Game is not started"}
+        game.started = True
+
+def test_end_turn():
+    headers = {
+    'Authorization': 'Bearer ' + pytest.users[2]["token"],
+    'Content-Type': 'text/plain'
+    }
+    response = client.post(f"/games/{pytest.info['game']}/endturn",
+        headers=headers,json={})
+    assert response.status_code == 200
+    assert response.json() == {"message": "Turn ended!"}
+    response = client.post(f"/games/1000/endturn",
+        headers=headers,json={})
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Game not found"}
+    with db_session:
+        game = Game.get(id=pytest.info['game'])
+        game.started = False
+        response = client.post(f"/games/{pytest.info['game']}/endturn",
+        headers=headers,json={})
+        assert response.status_code == 400
+        assert response.json() == {'detail': "Game is not started"}
+        game.started = True
 
 def test_delete_game():
     headers = {
