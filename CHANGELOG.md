@@ -1,0 +1,115 @@
+- Merge pull request #27 from ExpectoAprobarum/testing
+- Update README.md
+- readme updated
+- Test are ready
+- Merge branch 'development' into testing
+- Tests have been completed
+- fix duplicated name
+- fix spell elimination
+- fix caos
+- fix expelliarmus: pass turn
+- more chat and caos fixes
+- fixes of chat and caos
+- caos information
+- Merge pull request #26 from ExpectoAprobarum/V1
+- fix identation
+- Merge branch 'development' into V1
+- user info in messages and delete data of expelliarmus in endturn
+- Merge pull request #25 from ExpectoAprobarum/EA-93-Crucio
+- Backmerge done
+- detail comment and line order
+- expelliarmus and caos!
+- Fixed Crucio spell return value and added new spells to spell activation logic
+- Crucio has changed
+- Merge branch 'CHAT' into testing
+- Merge pull request #24 from ExpectoAprobarum/CHAT
+- quick fix spells
+- some of the new endpoint's test have been implemented
+- Backmerging to testing branch
+- Update games.py
+- crucio spell have been implemented
+- simplified detail info
+- fix get games test for new field and added win condition (voldemort headmaster)'
+- updated get games to list joined players
+- chat and imperius implemented
+- Merge pull request #23 from ExpectoAprobarum/testing
+- Update requirements.txt
+- Test are finished
+- Merge branch 'development' into testing
+- All tests done for demo
+- test for vote, get and post proclamations have been succesfully implemented
+- Merge pull request #22 from ExpectoAprobarum/confirmation
+- fixed quering user also by email
+- choosehm endpoint's test has been implemented
+- correcting typos@
+- verification of email by encripted code
+- Hot Fix
+- Merge pull request #21 from ExpectoAprobarum/fix-fire-headmaster
+- parse int'
+- fix headmaster as string
+- Merge pull request #20 from ExpectoAprobarum/fix-elections-count
+- Merge branch 'development' into testing
+- Merge pull request #19 from ExpectoAprobarum/hot_fixing_
+- fix counting total votes
+- Now a dead player cannot be headmaster
+- Merge branch 'development' into testing
+- fix delete game not started
+- Several endpoint's tests have been implemented
+- extend deck to 50 cards
+- Merge branch 'development' into testing
+- Merge pull request #12 from ExpectoAprobarum/EA-39-Avada_kedavra
+- Merge branch 'development' into EA-39-Avada_kedavra
+- Merge pull request #17 from ExpectoAprobarum/fixSpells
+- delete spell field in the end of the turn
+- endpoint finished
+- Merge branch 'EA-39-Avada_kedavra' of https://github.com/ExpectoAprobarum/BackendSV into EA-39-Avada_kedavra
+- test_main
+- Assign role fixed and avada kedavra endpoint now declares winning when you kill Voldemort
+- Merge pull request #16 from ExpectoAprobarum/fixVotes
+- deleting votes at the end of the round
+- Merge pull request #15 from ExpectoAprobarum/fixEndGame
+- empty spell field alreafy played
+- Merge pull request #14 from ExpectoAprobarum/fixPlayersOrder
+- fixed order of the players
+- Merge pull request #13 from ExpectoAprobarum/fix-turnpass
+- pass turn when there is no spell to play
+- Delete test_main.py
+- useralias added
+- avadakedavra endpoint tested
+- Avada endpoint is finished but still need testing
+- Merge pull request #11 from ExpectoAprobarum/fixDivination
+- divination fix
+- Merge pull request #10 from ExpectoAprobarum/divination
+- test for get games added
+- fixed choosable, reset headmaster, added divination and editable profile
+- test for start game had been implemented
+- tests for create game and join game had been implemented
+-  test for /USERS/ POST endpoint is done
+- Merge pull request #9 from ExpectoAprobarum/exit-game
+- endpoint almost done
+- fixing errors
+- message not used variables removed
+- refactor and pep8 styling for whole project, and added exit game endpoint
+- endpoint implemented, still need some fixing
+- current player endpoint
+- fix win_condition on de_proc
+- Merge pull request #8 from ExpectoAprobarum/PROC-VOTE
+- games deleted added
+- corrected delete game
+- proclamations, voting, and end of the game implemented
+- Merge pull request #7 from ExpectoAprobarum/list_players_updated
+- I have changed the list_players endpoint to retrieve username and userid, before It was retrieving only id.
+- Merge pull request #6 from ExpectoAprobarum/middleware
+- back merge of development
+- Merge pull request #5 from ExpectoAprobarum/GAME/AUTH-COMPLETE
+- fix join game
+- Auth and all endpoints from game implemented
+- middleware was implemented, still it is not tested
+- Merge pull request #3 from ExpectoAprobarum/readmeUpdate
+- READE UPDATED
+- corrected model game and route names
+- deleted database and innecesary requirements
+- Merge pull request #1 from ExpectoAprobarum/main
+- gitignore and Readme updated
+- definitive structure, fastAPI and ponyORM integration and games post and get
+- models added
