@@ -10,15 +10,8 @@
     $ hypercorn src.main:app --reload
 By default it will be running on http://127.0.0.1:8000
 
-To see swagger docs just add to the url: /docs
-
-### Endpoints
-
-* /games (get: list all games)
-* /games (post: create a new game, returns game id and a message)
-* /games/<id> (get a specific game)
-* /users (post/get)
-
+To see swagger docs (documentation of the API endpoints) just add to the app url: /docs
+For example: http://127.0.0.1:8000/docs
 
 ### Tests
 Run tests using:
